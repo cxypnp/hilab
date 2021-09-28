@@ -243,6 +243,10 @@ void netProton(TString outputplotsfolder = "outputFolder/")
 {
    system("rm -rf " + outputplotsfolder);
    system("mkdir -p " + outputplotsfolder);
+   system("mkdir -p " + outputplotsfolder+"/1Bin");
+   system("mkdir -p " + outputplotsfolder+"/2Bin");
+   system("mkdir -p " + outputplotsfolder+"/3Bin");
+   system("mkdir -p " + outputplotsfolder+"/6Bin");
 
    TCanvas *c1 = new TCanvas();
    c1->cd();
@@ -251,12 +255,11 @@ void netProton(TString outputplotsfolder = "outputFolder/")
 
    TFile f("outputFile.root");
    TH2F *h2NcgNpp = NULL;
-   TH2F *h2temp = NULL;
-   TH2F *h3NcgNppPhi[6];
+   TH2F *h2NcgNppPhi[6];
    f.GetObject("h2NcgNpp", h2NcgNpp);
    for (int i = 0; i < 6; i++)
    {
-      f.GetObject(Form("h3NcgNppPhi%d", i), h2temp);
+      f.GetObject(Form("h2NcgNppPhi%d", i), h2NcgNppPhi[i]);
    }
 
    if (!h2NcgNpp)
@@ -266,15 +269,13 @@ void netProton(TString outputplotsfolder = "outputFolder/")
       h2NcgNpp->GetXaxis()->SetTitle("Net-Proton");
       for (int i = 0; i < 6; i++)
       {
-         h2temp = new TH2F(Form("h3NcgNppPhi%d", i), Form("h3NcgNppPhi%d", i), 100, -5.5, 94.5, 450, -0.5, 449.5);
-         h2temp->GetYaxis()->SetTitle("Charged Multiplicity");
-         h2temp->GetXaxis()->SetTitle("Net-Proton");
-         h2temp->GetZaxis()->SetTitle("#Phi");
-         h3NcgNppPhi[i] = h2temp;
+         h2NcgNppPhi[i] = new TH2F(Form("h2NcgNppPhi%d", i), Form("h2NcgNppPhi%d", i), 100, -5.5, 94.5, 450, -0.5, 449.5);
+         h2NcgNppPhi[i]->GetYaxis()->SetTitle("Charged Multiplicity");
+         h2NcgNppPhi[i]->GetXaxis()->SetTitle("Net-Proton");
+         h2NcgNppPhi[i]->GetZaxis()->SetTitle("#Phi");
       }
-      fillHistograms(h2NcgNpp, h3NcgNppPhi);
+      fillHistograms(h2NcgNpp, h2NcgNppPhi);
    }
-
 
 
    double centraclityNchg[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -296,12 +297,12 @@ void netProton(TString outputplotsfolder = "outputFolder/")
 
    // Loop on every angle
    TFile *hfile = TFile::Open("outputFile.root", "RECREATE");
-   // h2NcgNpp->Write();
+   h2NcgNpp->Write();
    for (int i = 0; i < 6; i++)
    {
       double C1[9] = {0}, C2[9] = {0}, C3[9] = {0}, C4[9] = {0};
       double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
-      getCumulants(h3NcgNppPhi[i], C1, C2, C3, C4, centraclityNchg);
+      getCumulants(h2NcgNppPhi[i], C1, C2, C3, C4, centraclityNchg);
       for (int l = 0; l < 9; l++)
       {
          C2oC1[l] = C2[l] / C1[l];
@@ -311,35 +312,169 @@ void netProton(TString outputplotsfolder = "outputFolder/")
       TGraph *gC1 = new TGraph(9, centraclityNchg, C1);
       gC1->Draw("AC*");
       gC1->SetTitle("C1");
-      c1->SaveAs(outputplotsfolder + Form("gC1%d.png", i));
+      c1->SaveAs(outputplotsfolder +"6Bin/"+ Form("gC1%d-6Bin.png", i));
       TGraph *gC2 = new TGraph(9, centraclityNchg, C2);
       gC2->Draw("AC*");
       gC2->SetTitle("C2");
-      c1->SaveAs(outputplotsfolder + Form("gC2%d.png", i));
+      c1->SaveAs(outputplotsfolder + "6Bin/"+Form("gC2%d-6Bin.png", i));
       TGraph *gC3 = new TGraph(9, centraclityNchg, C3);
       gC3->Draw("AC*");
       gC3->SetTitle("C3");
-      c1->SaveAs(outputplotsfolder + Form("gC3%d.png", i));
+      c1->SaveAs(outputplotsfolder +"6Bin/"+ Form("gC3%d-6Bin.png", i));
       TGraph *gC4 = new TGraph(9, centraclityNchg, C4);
       gC4->Draw("AC*");
       gC4->SetTitle("C4");
-      c1->SaveAs(outputplotsfolder + Form("gC4%d.png", i));
+      c1->SaveAs(outputplotsfolder +"6Bin/"+ Form("gC4%d-6Bin.png", i));
 
       TGraph *gC2oC1 = new TGraph(9, centraclityNchg, C2oC1);
       gC2oC1->Draw("AC*");
       gC2oC1->SetTitle("C2oC1");
-      c1->SaveAs(outputplotsfolder + Form("gC2oC1%d.png", i));
+      c1->SaveAs(outputplotsfolder + "6Bin/"+Form("gC2oC1%d-6Bin.png", i));
       TGraph *gC3oC2 = new TGraph(9, centraclityNchg, C3oC2);
       gC3oC2->Draw("AC*");
       gC3oC2->SetTitle("C3oC2");
-      c1->SaveAs(outputplotsfolder + Form("gC3oC2%d.png", i));
+      c1->SaveAs(outputplotsfolder +"6Bin/"+ Form("gC3oC2%d-6Bin.png", i));
       TGraph *gC4oC2 = new TGraph(9, centraclityNchg, C4oC2);
       gC4oC2->Draw("AC*");
       gC4oC2->SetTitle("C4oC2");
-      c1->SaveAs(outputplotsfolder + Form("gC4oC2%d.png", i));
-      h3NcgNppPhi[i]->Write();
+      c1->SaveAs(outputplotsfolder +"6Bin/"+ Form("gC4oC2%d-6Bin.png", i));
+      h2NcgNppPhi[i]->Write();
    }
 
+   for (int i = 0; i < 6; )
+   {
+      double C1[9] = {0}, C2[9] = {0}, C3[9] = {0}, C4[9] = {0};
+      double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
+      TH2F temp=(*h2NcgNppPhi[i]+*h2NcgNppPhi[i+1]);
+      getCumulants(&temp, C1, C2, C3, C4, centraclityNchg);
+      for (int l = 0; l < 9; l++)
+      {
+         C2oC1[l] = C2[l] / C1[l];
+         C3oC2[l] = C3[l] / C2[l];
+         C4oC2[l] = C4[l] / C2[l];
+      }
+      TGraph *gC1 = new TGraph(9, centraclityNchg, C1);
+      gC1->Draw("AC*");
+      gC1->SetTitle("C1");
+      c1->SaveAs(outputplotsfolder + "3Bin/"+Form("gC1%d-3Bin.png", i));
+      TGraph *gC2 = new TGraph(9, centraclityNchg, C2);
+      gC2->Draw("AC*");
+      gC2->SetTitle("C2");
+      c1->SaveAs(outputplotsfolder + "3Bin/"+Form("gC2%d-3Bin.png", i));
+      TGraph *gC3 = new TGraph(9, centraclityNchg, C3);
+      gC3->Draw("AC*");
+      gC3->SetTitle("C3");
+      c1->SaveAs(outputplotsfolder + "3Bin/"+Form("gC3%d-3Bin.png", i));
+      TGraph *gC4 = new TGraph(9, centraclityNchg, C4);
+      gC4->Draw("AC*");
+      gC4->SetTitle("C4");
+      c1->SaveAs(outputplotsfolder + "3Bin/"+Form("gC4%d-3Bin.png", i));
+
+      TGraph *gC2oC1 = new TGraph(9, centraclityNchg, C2oC1);
+      gC2oC1->Draw("AC*");
+      gC2oC1->SetTitle("C2oC1");
+      c1->SaveAs(outputplotsfolder + "3Bin/"+Form("gC2oC1%d-3Bin.png", i));
+      TGraph *gC3oC2 = new TGraph(9, centraclityNchg, C3oC2);
+      gC3oC2->Draw("AC*");
+      gC3oC2->SetTitle("C3oC2");
+      c1->SaveAs(outputplotsfolder + "3Bin/"+Form("gC3oC2%d-3Bin.png", i));
+      TGraph *gC4oC2 = new TGraph(9, centraclityNchg, C4oC2);
+      gC4oC2->Draw("AC*");
+      gC4oC2->SetTitle("C4oC2");
+      c1->SaveAs(outputplotsfolder + "3Bin/"+Form("gC4oC2%d-3Bin.png", i));
+      i+=2;
+   }
+
+   for (int i = 0; i < 6; )
+   {
+      double C1[9] = {0}, C2[9] = {0}, C3[9] = {0}, C4[9] = {0};
+      double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
+      TH2F temp=(*h2NcgNppPhi[i]+*h2NcgNppPhi[i+1]);
+      temp=temp+*h2NcgNppPhi[i+2];
+      getCumulants(&temp, C1, C2, C3, C4, centraclityNchg);
+      for (int l = 0; l < 9; l++)
+      {
+         C2oC1[l] = C2[l] / C1[l];
+         C3oC2[l] = C3[l] / C2[l];
+         C4oC2[l] = C4[l] / C2[l];
+      }
+      TGraph *gC1 = new TGraph(9, centraclityNchg, C1);
+      gC1->Draw("AC*");
+      gC1->SetTitle("C1");
+      c1->SaveAs(outputplotsfolder + "2Bin/"+Form("gC1%d-2Bin.png", i));
+      TGraph *gC2 = new TGraph(9, centraclityNchg, C2);
+      gC2->Draw("AC*");
+      gC2->SetTitle("C2");
+      c1->SaveAs(outputplotsfolder + "2Bin/"+Form("gC2%d-2Bin.png", i));
+      TGraph *gC3 = new TGraph(9, centraclityNchg, C3);
+      gC3->Draw("AC*");
+      gC3->SetTitle("C3");
+      c1->SaveAs(outputplotsfolder + "2Bin/"+Form("gC3%d-2Bin.png", i));
+      TGraph *gC4 = new TGraph(9, centraclityNchg, C4);
+      gC4->Draw("AC*");
+      gC4->SetTitle("C4");
+      c1->SaveAs(outputplotsfolder + "2Bin/"+Form("gC4%d-2Bin.png", i));
+
+      TGraph *gC2oC1 = new TGraph(9, centraclityNchg, C2oC1);
+      gC2oC1->Draw("AC*");
+      gC2oC1->SetTitle("C2oC1");
+      c1->SaveAs(outputplotsfolder + "2Bin/"+Form("gC2oC1%d-2Bin.png", i));
+      TGraph *gC3oC2 = new TGraph(9, centraclityNchg, C3oC2);
+      gC3oC2->Draw("AC*");
+      gC3oC2->SetTitle("C3oC2");
+      c1->SaveAs(outputplotsfolder + "2Bin/"+Form("gC3oC2%d-2Bin.png", i));
+      TGraph *gC4oC2 = new TGraph(9, centraclityNchg, C4oC2);
+      gC4oC2->Draw("AC*");
+      gC4oC2->SetTitle("C4oC2");
+      c1->SaveAs(outputplotsfolder + "2Bin/"+Form("gC4oC2%d-2Bin.png", i));
+      i+=3;
+   }
+
+   TH2F temp=*h2NcgNppPhi[0];
+   for (int i = 1; i < 6; i++)
+   {
+      temp=temp+*h2NcgNppPhi[i];
+   }
+   temp.Write();
+      double C1[9] = {0}, C2[9] = {0}, C3[9] = {0}, C4[9] = {0};
+      double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
+      getCumulants(&temp, C1, C2, C3, C4, centraclityNchg);
+      for (int l = 0; l < 9; l++)
+      {
+         C2oC1[l] = C2[l] / C1[l];
+         C3oC2[l] = C3[l] / C2[l];
+         C4oC2[l] = C4[l] / C2[l];
+      }
+      TGraph *gC1 = new TGraph(9, centraclityNchg, C1);
+      gC1->Draw("AC*");
+      gC1->SetTitle("C1");
+      c1->SaveAs(outputplotsfolder + "1Bin/"+"gC1-1Bin.png");
+      TGraph *gC2 = new TGraph(9, centraclityNchg, C2);
+      gC2->Draw("AC*");
+      gC2->SetTitle("C2");
+      c1->SaveAs(outputplotsfolder +"1Bin/"+"gC2-1Bin.png");
+      TGraph *gC3 = new TGraph(9, centraclityNchg, C3);
+      gC3->Draw("AC*");
+      gC3->SetTitle("C3");
+      c1->SaveAs(outputplotsfolder + "1Bin/"+"gC3-1Bin.png");
+      TGraph *gC4 = new TGraph(9, centraclityNchg, C4);
+      gC4->Draw("AC*");
+      gC4->SetTitle("C4");
+      c1->SaveAs(outputplotsfolder +"1Bin/"+"gC4-1Bin.png");
+
+      TGraph *gC2oC1 = new TGraph(9, centraclityNchg, C2oC1);
+      gC2oC1->Draw("AC*");
+      gC2oC1->SetTitle("C2oC1");
+      c1->SaveAs(outputplotsfolder +"1Bin/"+ "gC2oC1-1Bin.png");
+      TGraph *gC3oC2 = new TGraph(9, centraclityNchg, C3oC2);
+      gC3oC2->Draw("AC*");
+      gC3oC2->SetTitle("C3oC2");
+      c1->SaveAs(outputplotsfolder +"1Bin/"+ "gC3oC2-1Bin.png");
+      TGraph *gC4oC2 = new TGraph(9, centraclityNchg, C4oC2);
+      gC4oC2->Draw("AC*");
+      gC4oC2->SetTitle("C4oC2");
+      c1->SaveAs(outputplotsfolder + "1Bin/"+"gC4oC2-1Bin.png");
+   
    // TGraph *gMean = new TGraph(9, centraclityNchg, mean);
    // gMean->Draw("AC*");
    // gMean->SetTitle("gMean");
@@ -356,7 +491,7 @@ void netProton(TString outputplotsfolder = "outputFolder/")
    // gKappa->Draw("AC*");
    // gKappa->SetTitle("gKappa");
    // c1->SaveAs(outputplotsfolder + "gKappa.png");
-
+   
    c1->SetLogy(1);
    h2NcgNpp->ProjectionX()->DrawNormalized("E");
    h2NcgNpp->SetTitle("Net-proton production vs. N_{chg}");
@@ -384,6 +519,6 @@ void netProton(TString outputplotsfolder = "outputFolder/")
    int ybins = h2NcgNpp->GetYaxis()->GetNbins();
 
    // drawEvent()->Write();
-   hfile->Write();
+   // hfile->Write();
    hfile->Close();
 }

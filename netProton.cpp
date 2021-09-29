@@ -8,11 +8,11 @@
 #include "TDirectory.h"
 #include "TTree.h"
 #include "TCanvas.h"
-#include "TGraph.h"
+#include "TGraphErrors.h"
 #include "TStyle.h"
 #include "TMath.h"
 #include "f14.h"
-
+#include "TMultiGraph.h"
 using namespace std;
 
 void centralityBound(double *centraclityNchg, TH1D *refmult3)
@@ -41,13 +41,19 @@ void centralityBound(double *centraclityNchg, TH1D *refmult3)
    }
 }
 
-double getPhi(double x, double y)
+double getPhiAbs(double x, double y)
 {
-   return atan2(abs(x), abs(y));
+   return atan2(abs(y), abs(x));
 }
 
-void fillHistograms(TH2F *h2NcgNpp, TH2F **h2NcgNppPhi)
+double getPhi(double x, double y)
 {
+   return atan(y / x);
+}
+
+void fillHistograms(TH2F *h2NcgNpp, TH2F **h2NcgNppPhi, bool reconstruction)
+{
+   TH1F *h1EventPlane = new TH1F("h1EventPlane", "h1EventPlane", 1000, -0.5 * TMath::Pi(), 0.5 * TMath::Pi());
    TTree *event = NULL;
 
    f14 reader(event);
@@ -66,6 +72,8 @@ void fillHistograms(TH2F *h2NcgNpp, TH2F **h2NcgNppPhi)
          break;
       int _nNetProton = 0;
       int _nCharged = 0;
+      int _nTotalCharged = 0;
+      double sumQx = 0, sumQy = 0;
       nb = reader.fChain->GetEntry(jentry);
       nbytes += nb;
 
@@ -75,17 +83,18 @@ void fillHistograms(TH2F *h2NcgNpp, TH2F **h2NcgNppPhi)
          continue;
       }
 
-      // Read a Event
+      // Read a Event, Determine the Centrality and Event plane of this event
       for (Int_t j = 0; j < reader.fColHdr_Ntrack; j++)
       {
          // Charged Particle
          if ((reader.fTracksOut_chg[j] != 0))
          {
+            float pT = TMath::Sqrt(reader.fTracksOut_px[j] * reader.fTracksOut_px[j] + reader.fTracksOut_py[j] * reader.fTracksOut_py[j]);
             // Is it (anti-)proton?
             if ((reader.fTracksOut_ityp[j] == 1) || (reader.fTracksOut_ityp[j] == -1))
             {
                // (anti-)proton
-               float pT = TMath::Sqrt(reader.fTracksOut_px[j] * reader.fTracksOut_px[j] + reader.fTracksOut_py[j] * reader.fTracksOut_py[j]);
+
                float y = 0.5 * log((reader.fTracksOut_p0[j] + reader.fTracksOut_pz[j]) / (reader.fTracksOut_p0[j] - reader.fTracksOut_pz[j]));
 
                if (TMath::Abs(y) < 0.5 && pT < 2.0 && pT > 0.4)
@@ -99,7 +108,6 @@ void fillHistograms(TH2F *h2NcgNpp, TH2F **h2NcgNppPhi)
             else
             {
                // Other Particle
-               float pT = TMath::Sqrt(reader.fTracksOut_px[j] * reader.fTracksOut_px[j] + reader.fTracksOut_py[j] * reader.fTracksOut_py[j]);
                float p = TMath::Sqrt(reader.fTracksOut_px[j] * reader.fTracksOut_px[j] + reader.fTracksOut_py[j] * reader.fTracksOut_py[j] + reader.fTracksOut_pz[j] * reader.fTracksOut_pz[j]);
                float eta = 0.5 * log((p + reader.fTracksOut_pz[j]) / (p - reader.fTracksOut_pz[j]));
                if (TMath::Abs(eta) < 1 && pT > 0.1)
@@ -107,11 +115,15 @@ void fillHistograms(TH2F *h2NcgNpp, TH2F **h2NcgNppPhi)
                   _nCharged++;
                }
             }
+            sumQx += pT * cos(2 * getPhi(reader.fTracksOut_rx[j], reader.fTracksOut_ry[j]));
+            sumQy += pT * sin(2 * getPhi(reader.fTracksOut_rx[j], reader.fTracksOut_ry[j]));
+            _nTotalCharged++;
          }
       }
+      double Psi = 1.0 / 2.0 * atan(sumQy / sumQx);
+      h1EventPlane->Fill(Psi);
       h2NcgNpp->Fill(_nNetProton, _nCharged);
-      // Have known the Ncg and Npp, fill the h3 with the phi of every particle
-
+      // Have known the Ncg and Npp, fill the h2 with the phi of every particle
       int _nNetProtonPhi[6] = {0, 0, 0, 0, 0, 0};
       for (Int_t j = 0; j < reader.fColHdr_Ntrack; j++)
       {
@@ -126,7 +138,15 @@ void fillHistograms(TH2F *h2NcgNpp, TH2F **h2NcgNppPhi)
                float y = 0.5 * log((reader.fTracksOut_p0[j] + reader.fTracksOut_pz[j]) / (reader.fTracksOut_p0[j] - reader.fTracksOut_pz[j]));
                if (TMath::Abs(y) < 0.5 && pT < 2.0 && pT > 0.4)
                {
-                  int index = getPhi(reader.fTracksOut_rx[j], reader.fTracksOut_ry[j]) / (TMath::Pi() * 1.0 / 12);
+                  int index = 0;
+                  if (reconstruction)
+                  {
+                     index = getPhiAbs(reader.fTracksOut_rx[j] * cos(Psi) + reader.fTracksOut_ry[j] * sin(Psi), reader.fTracksOut_ry[j] * cos(Psi) - reader.fTracksOut_rx[j] * sin(Psi)) / (TMath::Pi() * 1.0 / 12);
+                  }
+                  else
+                  {
+                     index = getPhiAbs(reader.fTracksOut_rx[j], reader.fTracksOut_ry[j]) / (TMath::Pi() * 1.0 / 12);
+                  }
                   if (reader.fTracksOut_ityp[j] == 1)
                      _nNetProtonPhi[index]++;
                   else if (reader.fTracksOut_ityp[j] == -1)
@@ -144,6 +164,9 @@ void fillHistograms(TH2F *h2NcgNpp, TH2F **h2NcgNppPhi)
          h2NcgNppPhi[j]->Fill(_nNetProtonPhi[j], _nCharged);
       }
    }
+   TCanvas *cTemp = new TCanvas();
+   h1EventPlane->Draw();
+   cTemp->SaveAs("h1EventPlane.png");
 }
 
 TH3I *drawEvent()
@@ -243,10 +266,13 @@ void netProton(TString outputplotsfolder = "outputFolder/")
 {
    system("rm -rf " + outputplotsfolder);
    system("mkdir -p " + outputplotsfolder);
-   system("mkdir -p " + outputplotsfolder+"/1Bin");
-   system("mkdir -p " + outputplotsfolder+"/2Bin");
-   system("mkdir -p " + outputplotsfolder+"/3Bin");
-   system("mkdir -p " + outputplotsfolder+"/6Bin");
+   for (int i = 0; i < 9; i++)
+   {
+      system(Form("mkdir -p " + outputplotsfolder + "/%d", i));
+      system(Form("mkdir -p " + outputplotsfolder + "/%d", i));
+      system(Form("mkdir -p " + outputplotsfolder + "/%d", i));
+      system(Form("mkdir -p " + outputplotsfolder + "/%d", i));
+   }
 
    TCanvas *c1 = new TCanvas();
    c1->cd();
@@ -274,12 +300,18 @@ void netProton(TString outputplotsfolder = "outputFolder/")
          h2NcgNppPhi[i]->GetXaxis()->SetTitle("Net-Proton");
          h2NcgNppPhi[i]->GetZaxis()->SetTitle("#Phi");
       }
-      fillHistograms(h2NcgNpp, h2NcgNppPhi);
+      fillHistograms(h2NcgNpp, h2NcgNppPhi, true);
    }
-
 
    double centraclityNchg[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
    centralityBound(centraclityNchg, h2NcgNpp->ProjectionY());
+   TFile *hfile = TFile::Open("outputFile.root", "RECREATE");
+   for (int i = 0; i < 6; i++)
+   {
+      h2NcgNppPhi[i]->Write();
+      h2NcgNppPhi[i]->Draw();
+      c1->SaveAs(Form(outputplotsfolder + "h2NcgNppPhi%d.png", i));
+   }
 
    // ofstream logOut;
    // logOut.open(outputplotsfolder + "run.log", ios_base::app);
@@ -296,8 +328,34 @@ void netProton(TString outputplotsfolder = "outputFolder/")
    // }
 
    // Loop on every angle
-   TFile *hfile = TFile::Open("outputFile.root", "RECREATE");
+
    h2NcgNpp->Write();
+
+   double x1Bin = 0.5 * TMath::Pi() / 2;
+   double x1err = 0.5 * TMath::Pi() / 2;
+   double x2Bin[2] = {0.125 * TMath::Pi(), 0.375 * TMath::Pi()};
+   double x2err[2] = {0.125 * TMath::Pi(), 0.125 * TMath::Pi()};
+   double x3Bin[3] = {1.0 * TMath::Pi() / 12, 3.0 * TMath::Pi() / 12, 5.0 * TMath::Pi() / 12};
+   double x3err[3] = {1.0 * TMath::Pi() / 12, 1.0 * TMath::Pi() / 12, 1.0 * TMath::Pi() / 12};
+   double x6Bin[6] = {1.0 * TMath::Pi() / 24, 3.0 * TMath::Pi() / 24, 5.0 * TMath::Pi() / 24, 7.0 * TMath::Pi() / 24, 9.0 * TMath::Pi() / 24, 11.0 * TMath::Pi() / 24};
+   double x6err[6] = {1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24};
+
+   double C2oC1VsPhi6Bin[9][6];
+   double C3oC2VsPhi6Bin[9][6];
+   double C4oC2VsPhi6Bin[9][6];
+
+   double C2oC1VsPhi3Bin[9][3];
+   double C3oC2VsPhi3Bin[9][3];
+   double C4oC2VsPhi3Bin[9][3];
+
+   double C2oC1VsPhi2Bin[9][2];
+   double C3oC2VsPhi2Bin[9][2];
+   double C4oC2VsPhi2Bin[9][2];
+
+   double C2oC1VsPhi1Bin[9];
+   double C3oC2VsPhi1Bin[9];
+   double C4oC2VsPhi1Bin[9];
+   // 6 Bins
    for (int i = 0; i < 6; i++)
    {
       double C1[9] = {0}, C2[9] = {0}, C3[9] = {0}, C4[9] = {0};
@@ -309,43 +367,19 @@ void netProton(TString outputplotsfolder = "outputFolder/")
          C3oC2[l] = C3[l] / C2[l];
          C4oC2[l] = C4[l] / C2[l];
       }
-      TGraph *gC1 = new TGraph(9, centraclityNchg, C1);
-      gC1->Draw("AC*");
-      gC1->SetTitle("C1");
-      c1->SaveAs(outputplotsfolder +"6Bin/"+ Form("gC1%d-6Bin.png", i));
-      TGraph *gC2 = new TGraph(9, centraclityNchg, C2);
-      gC2->Draw("AC*");
-      gC2->SetTitle("C2");
-      c1->SaveAs(outputplotsfolder + "6Bin/"+Form("gC2%d-6Bin.png", i));
-      TGraph *gC3 = new TGraph(9, centraclityNchg, C3);
-      gC3->Draw("AC*");
-      gC3->SetTitle("C3");
-      c1->SaveAs(outputplotsfolder +"6Bin/"+ Form("gC3%d-6Bin.png", i));
-      TGraph *gC4 = new TGraph(9, centraclityNchg, C4);
-      gC4->Draw("AC*");
-      gC4->SetTitle("C4");
-      c1->SaveAs(outputplotsfolder +"6Bin/"+ Form("gC4%d-6Bin.png", i));
-
-      TGraph *gC2oC1 = new TGraph(9, centraclityNchg, C2oC1);
-      gC2oC1->Draw("AC*");
-      gC2oC1->SetTitle("C2oC1");
-      c1->SaveAs(outputplotsfolder + "6Bin/"+Form("gC2oC1%d-6Bin.png", i));
-      TGraph *gC3oC2 = new TGraph(9, centraclityNchg, C3oC2);
-      gC3oC2->Draw("AC*");
-      gC3oC2->SetTitle("C3oC2");
-      c1->SaveAs(outputplotsfolder +"6Bin/"+ Form("gC3oC2%d-6Bin.png", i));
-      TGraph *gC4oC2 = new TGraph(9, centraclityNchg, C4oC2);
-      gC4oC2->Draw("AC*");
-      gC4oC2->SetTitle("C4oC2");
-      c1->SaveAs(outputplotsfolder +"6Bin/"+ Form("gC4oC2%d-6Bin.png", i));
-      h2NcgNppPhi[i]->Write();
+      for (int j = 0; j < 9; j++)
+      {
+         C2oC1VsPhi6Bin[j][i] = C2oC1[j];
+         C3oC2VsPhi6Bin[j][i] = C3oC2[j];
+         C4oC2VsPhi6Bin[j][i] = C4oC2[j];
+      }
    }
 
-   for (int i = 0; i < 6; )
+   for (int i = 0; i < 6;)
    {
       double C1[9] = {0}, C2[9] = {0}, C3[9] = {0}, C4[9] = {0};
       double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
-      TH2F temp=(*h2NcgNppPhi[i]+*h2NcgNppPhi[i+1]);
+      TH2F temp = (*h2NcgNppPhi[i] + *h2NcgNppPhi[i + 1]);
       getCumulants(&temp, C1, C2, C3, C4, centraclityNchg);
       for (int l = 0; l < 9; l++)
       {
@@ -353,44 +387,21 @@ void netProton(TString outputplotsfolder = "outputFolder/")
          C3oC2[l] = C3[l] / C2[l];
          C4oC2[l] = C4[l] / C2[l];
       }
-      TGraph *gC1 = new TGraph(9, centraclityNchg, C1);
-      gC1->Draw("AC*");
-      gC1->SetTitle("C1");
-      c1->SaveAs(outputplotsfolder + "3Bin/"+Form("gC1%d-3Bin.png", i));
-      TGraph *gC2 = new TGraph(9, centraclityNchg, C2);
-      gC2->Draw("AC*");
-      gC2->SetTitle("C2");
-      c1->SaveAs(outputplotsfolder + "3Bin/"+Form("gC2%d-3Bin.png", i));
-      TGraph *gC3 = new TGraph(9, centraclityNchg, C3);
-      gC3->Draw("AC*");
-      gC3->SetTitle("C3");
-      c1->SaveAs(outputplotsfolder + "3Bin/"+Form("gC3%d-3Bin.png", i));
-      TGraph *gC4 = new TGraph(9, centraclityNchg, C4);
-      gC4->Draw("AC*");
-      gC4->SetTitle("C4");
-      c1->SaveAs(outputplotsfolder + "3Bin/"+Form("gC4%d-3Bin.png", i));
-
-      TGraph *gC2oC1 = new TGraph(9, centraclityNchg, C2oC1);
-      gC2oC1->Draw("AC*");
-      gC2oC1->SetTitle("C2oC1");
-      c1->SaveAs(outputplotsfolder + "3Bin/"+Form("gC2oC1%d-3Bin.png", i));
-      TGraph *gC3oC2 = new TGraph(9, centraclityNchg, C3oC2);
-      gC3oC2->Draw("AC*");
-      gC3oC2->SetTitle("C3oC2");
-      c1->SaveAs(outputplotsfolder + "3Bin/"+Form("gC3oC2%d-3Bin.png", i));
-      TGraph *gC4oC2 = new TGraph(9, centraclityNchg, C4oC2);
-      gC4oC2->Draw("AC*");
-      gC4oC2->SetTitle("C4oC2");
-      c1->SaveAs(outputplotsfolder + "3Bin/"+Form("gC4oC2%d-3Bin.png", i));
-      i+=2;
+      for (int j = 0; j < 9; j++)
+      {
+         C2oC1VsPhi3Bin[j][i / 2] = C2oC1[j];
+         C3oC2VsPhi3Bin[j][i / 2] = C3oC2[j];
+         C4oC2VsPhi3Bin[j][i / 2] = C4oC2[j];
+      }
+      i += 2;
    }
 
-   for (int i = 0; i < 6; )
+   for (int i = 0; i < 6;)
    {
       double C1[9] = {0}, C2[9] = {0}, C3[9] = {0}, C4[9] = {0};
       double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
-      TH2F temp=(*h2NcgNppPhi[i]+*h2NcgNppPhi[i+1]);
-      temp=temp+*h2NcgNppPhi[i+2];
+      TH2F temp = (*h2NcgNppPhi[i] + *h2NcgNppPhi[i + 1]);
+      temp = temp + *h2NcgNppPhi[i + 2];
       getCumulants(&temp, C1, C2, C3, C4, centraclityNchg);
       for (int l = 0; l < 9; l++)
       {
@@ -398,100 +409,121 @@ void netProton(TString outputplotsfolder = "outputFolder/")
          C3oC2[l] = C3[l] / C2[l];
          C4oC2[l] = C4[l] / C2[l];
       }
-      TGraph *gC1 = new TGraph(9, centraclityNchg, C1);
-      gC1->Draw("AC*");
-      gC1->SetTitle("C1");
-      c1->SaveAs(outputplotsfolder + "2Bin/"+Form("gC1%d-2Bin.png", i));
-      TGraph *gC2 = new TGraph(9, centraclityNchg, C2);
-      gC2->Draw("AC*");
-      gC2->SetTitle("C2");
-      c1->SaveAs(outputplotsfolder + "2Bin/"+Form("gC2%d-2Bin.png", i));
-      TGraph *gC3 = new TGraph(9, centraclityNchg, C3);
-      gC3->Draw("AC*");
-      gC3->SetTitle("C3");
-      c1->SaveAs(outputplotsfolder + "2Bin/"+Form("gC3%d-2Bin.png", i));
-      TGraph *gC4 = new TGraph(9, centraclityNchg, C4);
-      gC4->Draw("AC*");
-      gC4->SetTitle("C4");
-      c1->SaveAs(outputplotsfolder + "2Bin/"+Form("gC4%d-2Bin.png", i));
-
-      TGraph *gC2oC1 = new TGraph(9, centraclityNchg, C2oC1);
-      gC2oC1->Draw("AC*");
-      gC2oC1->SetTitle("C2oC1");
-      c1->SaveAs(outputplotsfolder + "2Bin/"+Form("gC2oC1%d-2Bin.png", i));
-      TGraph *gC3oC2 = new TGraph(9, centraclityNchg, C3oC2);
-      gC3oC2->Draw("AC*");
-      gC3oC2->SetTitle("C3oC2");
-      c1->SaveAs(outputplotsfolder + "2Bin/"+Form("gC3oC2%d-2Bin.png", i));
-      TGraph *gC4oC2 = new TGraph(9, centraclityNchg, C4oC2);
-      gC4oC2->Draw("AC*");
-      gC4oC2->SetTitle("C4oC2");
-      c1->SaveAs(outputplotsfolder + "2Bin/"+Form("gC4oC2%d-2Bin.png", i));
-      i+=3;
+      for (int j = 0; j < 9; j++)
+      {
+         C2oC1VsPhi2Bin[j][i / 3] = C2oC1[j];
+         C3oC2VsPhi2Bin[j][i / 3] = C3oC2[j];
+         C4oC2VsPhi2Bin[j][i / 3] = C4oC2[j];
+      }
+      i += 3;
    }
 
-   TH2F temp=*h2NcgNppPhi[0];
+   TH2F temp = *h2NcgNppPhi[0];
    for (int i = 1; i < 6; i++)
    {
-      temp=temp+*h2NcgNppPhi[i];
+      temp = temp + *h2NcgNppPhi[i];
    }
    temp.Write();
-      double C1[9] = {0}, C2[9] = {0}, C3[9] = {0}, C4[9] = {0};
-      double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
-      getCumulants(&temp, C1, C2, C3, C4, centraclityNchg);
-      for (int l = 0; l < 9; l++)
-      {
-         C2oC1[l] = C2[l] / C1[l];
-         C3oC2[l] = C3[l] / C2[l];
-         C4oC2[l] = C4[l] / C2[l];
-      }
-      TGraph *gC1 = new TGraph(9, centraclityNchg, C1);
-      gC1->Draw("AC*");
-      gC1->SetTitle("C1");
-      c1->SaveAs(outputplotsfolder + "1Bin/"+"gC1-1Bin.png");
-      TGraph *gC2 = new TGraph(9, centraclityNchg, C2);
-      gC2->Draw("AC*");
-      gC2->SetTitle("C2");
-      c1->SaveAs(outputplotsfolder +"1Bin/"+"gC2-1Bin.png");
-      TGraph *gC3 = new TGraph(9, centraclityNchg, C3);
-      gC3->Draw("AC*");
-      gC3->SetTitle("C3");
-      c1->SaveAs(outputplotsfolder + "1Bin/"+"gC3-1Bin.png");
-      TGraph *gC4 = new TGraph(9, centraclityNchg, C4);
-      gC4->Draw("AC*");
-      gC4->SetTitle("C4");
-      c1->SaveAs(outputplotsfolder +"1Bin/"+"gC4-1Bin.png");
+   double C1[9] = {0}, C2[9] = {0}, C3[9] = {0}, C4[9] = {0};
+   double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
+   getCumulants(&temp, C1, C2, C3, C4, centraclityNchg);
+   for (int l = 0; l < 9; l++)
+   {
+      C2oC1[l] = C2[l] / C1[l];
+      C3oC2[l] = C3[l] / C2[l];
+      C4oC2[l] = C4[l] / C2[l];
+   }
+   for (int j = 0; j < 9; j++)
+   {
+      C2oC1VsPhi1Bin[j] = C2oC1[j];
+      C3oC2VsPhi1Bin[j] = C3oC2[j];
+      C4oC2VsPhi1Bin[j] = C4oC2[j];
+      cout << C4oC2[j] << endl;
+   }
 
-      TGraph *gC2oC1 = new TGraph(9, centraclityNchg, C2oC1);
-      gC2oC1->Draw("AC*");
-      gC2oC1->SetTitle("C2oC1");
-      c1->SaveAs(outputplotsfolder +"1Bin/"+ "gC2oC1-1Bin.png");
-      TGraph *gC3oC2 = new TGraph(9, centraclityNchg, C3oC2);
-      gC3oC2->Draw("AC*");
-      gC3oC2->SetTitle("C3oC2");
-      c1->SaveAs(outputplotsfolder +"1Bin/"+ "gC3oC2-1Bin.png");
-      TGraph *gC4oC2 = new TGraph(9, centraclityNchg, C4oC2);
-      gC4oC2->Draw("AC*");
-      gC4oC2->SetTitle("C4oC2");
-      c1->SaveAs(outputplotsfolder + "1Bin/"+"gC4oC2-1Bin.png");
-   
-   // TGraph *gMean = new TGraph(9, centraclityNchg, mean);
-   // gMean->Draw("AC*");
-   // gMean->SetTitle("gMean");
-   // c1->SaveAs(outputplotsfolder + "gMean.png");
-   // TGraph *gSigma = new TGraph(9, centraclityNchg, sigma);
-   // gSigma->Draw("AC*");
-   // gSigma->SetTitle("gSigma");
-   // c1->SaveAs(outputplotsfolder + "gSigma.png");
-   // TGraph *gS = new TGraph(9, centraclityNchg, fS);
-   // gS->Draw("AC*");
-   // gS->SetTitle("gS");
-   // c1->SaveAs(outputplotsfolder + "gS.png");
-   // TGraph *gKappa = new TGraph(9, centraclityNchg, kappa);
-   // gKappa->Draw("AC*");
-   // gKappa->SetTitle("gKappa");
-   // c1->SaveAs(outputplotsfolder + "gKappa.png");
-   
+   for (int i = 0; i < 9; i++)
+   {
+
+      c1->Clear();
+      TGraphErrors *h1C2oC1VsPhi1Bin = new TGraphErrors(1, &x1Bin, &C2oC1VsPhi1Bin[i], &x1err, NULL);
+      h1C2oC1VsPhi1Bin->SetLineColor(2);
+      h1C2oC1VsPhi1Bin->SetMarkerSize(1);
+      h1C2oC1VsPhi1Bin->SetMarkerStyle(20);
+      TGraphErrors *h1C2oC1VsPhi2Bin = new TGraphErrors(2, x2Bin, C2oC1VsPhi2Bin[i], x2err, NULL);
+      h1C2oC1VsPhi2Bin->SetLineColor(3);
+      h1C2oC1VsPhi2Bin->SetMarkerSize(1);
+      h1C2oC1VsPhi2Bin->SetMarkerStyle(21);
+      TGraphErrors *h1C2oC1VsPhi3Bin = new TGraphErrors(3, x3Bin, C2oC1VsPhi3Bin[i], x3err, NULL);
+      h1C2oC1VsPhi3Bin->SetLineColor(4);
+      h1C2oC1VsPhi3Bin->SetMarkerSize(1);
+      h1C2oC1VsPhi3Bin->SetMarkerStyle(22);
+      TGraphErrors *h1C2oC1VsPhi6Bin = new TGraphErrors(6, x6Bin, C2oC1VsPhi6Bin[i], x6err, NULL);
+      h1C2oC1VsPhi6Bin->SetLineColor(7);
+      h1C2oC1VsPhi6Bin->SetMarkerSize(1);
+      h1C2oC1VsPhi6Bin->SetMarkerStyle(23);
+      TMultiGraph *mg = new TMultiGraph();
+      mg->Add(h1C2oC1VsPhi1Bin);
+      mg->Add(h1C2oC1VsPhi2Bin);
+      mg->Add(h1C2oC1VsPhi3Bin);
+      mg->Add(h1C2oC1VsPhi6Bin);
+      mg->Draw("zpA");
+      c1->SaveAs(Form(outputplotsfolder + "%d/h1C2oC1VsPhiCentral.png", i));
+      c1->SetTitle(Form("h1C2oC1VsPhiCentral%d", i));
+
+      TGraphErrors *h1C3oC2VsPhi1Bin = new TGraphErrors(1, &x1Bin, &C3oC2VsPhi1Bin[i], &x1err, NULL);
+      h1C3oC2VsPhi1Bin->SetLineColor(2);
+      h1C3oC2VsPhi1Bin->SetMarkerSize(1);
+      h1C2oC1VsPhi1Bin->SetMarkerStyle(20);
+      TGraphErrors *h1C3oC2VsPhi2Bin = new TGraphErrors(2, x2Bin, C3oC2VsPhi2Bin[i], x2err, NULL);
+      h1C3oC2VsPhi2Bin->SetLineColor(3);
+      h1C3oC2VsPhi2Bin->SetMarkerSize(1);
+      h1C3oC2VsPhi2Bin->SetMarkerStyle(21);
+      TGraphErrors *h1C3oC2VsPhi3Bin = new TGraphErrors(3, x3Bin, C3oC2VsPhi3Bin[i], x3err, NULL);
+      h1C3oC2VsPhi3Bin->SetLineColor(4);
+      h1C3oC2VsPhi3Bin->SetMarkerSize(1);
+      h1C3oC2VsPhi3Bin->SetMarkerStyle(22);
+      TGraphErrors *h1C3oC2VsPhi6Bin = new TGraphErrors(6, x6Bin, C3oC2VsPhi6Bin[i], x6err, NULL);
+      h1C3oC2VsPhi6Bin->SetLineColor(7);
+      h1C3oC2VsPhi6Bin->SetMarkerSize(1);
+      h1C3oC2VsPhi6Bin->SetMarkerStyle(23);
+      mg = new TMultiGraph();
+      mg->Add(h1C3oC2VsPhi1Bin);
+      mg->Add(h1C3oC2VsPhi2Bin);
+      mg->Add(h1C3oC2VsPhi3Bin);
+      mg->Add(h1C3oC2VsPhi6Bin);
+      mg->Draw("zpA");
+      c1->Size(0, 0);
+      c1->SaveAs(Form(outputplotsfolder + "%d/h1C3oC2VsPhiCentral.png", i));
+      c1->SetTitle(Form("h1vVsPhiCentral%d", i));
+
+      c1->Clear();
+      TGraphErrors *h1C4oC2VsPhi1Bin = new TGraphErrors(1, &x1Bin, &C4oC2VsPhi1Bin[i], &x1err, NULL);
+      h1C4oC2VsPhi1Bin->SetLineColor(2);
+      h1C4oC2VsPhi1Bin->SetMarkerSize(1);
+      h1C4oC2VsPhi1Bin->SetMarkerStyle(20);
+      TGraphErrors *h1C4oC2VsPhi2Bin = new TGraphErrors(2, x2Bin, C4oC2VsPhi2Bin[i], x2err, NULL);
+      h1C4oC2VsPhi2Bin->SetLineColor(3);
+      h1C4oC2VsPhi2Bin->SetMarkerSize(1);
+      h1C4oC2VsPhi2Bin->SetMarkerStyle(21);
+      TGraphErrors *h1C4oC2VsPhi3Bin = new TGraphErrors(3, x3Bin, C4oC2VsPhi3Bin[i], x3err, NULL);
+      h1C4oC2VsPhi3Bin->SetLineColor(4);
+      h1C4oC2VsPhi3Bin->SetMarkerSize(1);
+      h1C4oC2VsPhi3Bin->SetMarkerStyle(22);
+      TGraphErrors *h1C4oC2VsPhi6Bin = new TGraphErrors(6, x6Bin, C4oC2VsPhi6Bin[i], x6err, NULL);
+      h1C4oC2VsPhi6Bin->SetLineColor(7);
+      h1C4oC2VsPhi6Bin->SetMarkerSize(1);
+      h1C3oC2VsPhi6Bin->SetMarkerStyle(23);
+      mg = new TMultiGraph();
+      mg->Add(h1C4oC2VsPhi1Bin);
+      mg->Add(h1C4oC2VsPhi2Bin);
+      mg->Add(h1C4oC2VsPhi3Bin);
+      mg->Add(h1C4oC2VsPhi6Bin);
+      mg->Draw("zpA");
+      c1->Size(0, 0);
+      c1->SaveAs(Form(outputplotsfolder + "%d/h1C4oC2VsPhiCentral.png", i));
+      c1->SetTitle(Form("h1vVsPhiCentral%d", i));
+   }
+
    c1->SetLogy(1);
    h2NcgNpp->ProjectionX()->DrawNormalized("E");
    h2NcgNpp->SetTitle("Net-proton production vs. N_{chg}");
@@ -519,6 +551,6 @@ void netProton(TString outputplotsfolder = "outputFolder/")
    int ybins = h2NcgNpp->GetYaxis()->GetNbins();
 
    // drawEvent()->Write();
-   // hfile->Write();
+   hfile->Write();
    hfile->Close();
 }

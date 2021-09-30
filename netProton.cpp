@@ -166,6 +166,7 @@ void fillHistograms(TH2F *h2NcgNpp, TH2F **h2NcgNppPhi, bool reconstruction)
    }
    TCanvas *cTemp = new TCanvas();
    h1EventPlane->Draw();
+   h1EventPlane->GetXaxis()->SetTitle("#psi_2-#psi_{RP}");
    cTemp->SaveAs("h1EventPlane.png");
 }
 
@@ -298,7 +299,7 @@ void netProton(TString outputplotsfolder = "outputFolder/")
          h2NcgNppPhi[i] = new TH2F(Form("h2NcgNppPhi%d", i), Form("h2NcgNppPhi%d", i), 100, -5.5, 94.5, 450, -0.5, 449.5);
          h2NcgNppPhi[i]->GetYaxis()->SetTitle("Charged Multiplicity");
          h2NcgNppPhi[i]->GetXaxis()->SetTitle("Net-Proton");
-         h2NcgNppPhi[i]->GetZaxis()->SetTitle("#Phi");
+         h2NcgNppPhi[i]->GetZaxis()->SetTitle("#phi");
       }
       fillHistograms(h2NcgNpp, h2NcgNppPhi, true);
    }
@@ -309,7 +310,7 @@ void netProton(TString outputplotsfolder = "outputFolder/")
    for (int i = 0; i < 6; i++)
    {
       h2NcgNppPhi[i]->Write();
-      h2NcgNppPhi[i]->Draw();
+      h2NcgNppPhi[i]->Draw("COLZ");
       c1->SaveAs(Form(outputplotsfolder + "h2NcgNppPhi%d.png", i));
    }
 
@@ -466,6 +467,8 @@ void netProton(TString outputplotsfolder = "outputFolder/")
       mg->Add(h1C2oC1VsPhi2Bin);
       mg->Add(h1C2oC1VsPhi3Bin);
       mg->Add(h1C2oC1VsPhi6Bin);
+      mg->SetTitle("C_{2}/C_{1}");
+      mg->GetXaxis()->SetTitle("#phi-#psi_{RP}");
       mg->Draw("zpA");
       c1->SaveAs(Form(outputplotsfolder + "%d/h1C2oC1VsPhiCentral.png", i));
       c1->SetTitle(Form("h1C2oC1VsPhiCentral%d", i));
@@ -491,6 +494,8 @@ void netProton(TString outputplotsfolder = "outputFolder/")
       mg->Add(h1C3oC2VsPhi2Bin);
       mg->Add(h1C3oC2VsPhi3Bin);
       mg->Add(h1C3oC2VsPhi6Bin);
+      mg->SetTitle("C_{3}/C_{2}");
+      mg->GetXaxis()->SetTitle("#phi-#psi_{RP}");
       mg->Draw("zpA");
       c1->Size(0, 0);
       c1->SaveAs(Form(outputplotsfolder + "%d/h1C3oC2VsPhiCentral.png", i));
@@ -498,6 +503,7 @@ void netProton(TString outputplotsfolder = "outputFolder/")
 
       c1->Clear();
       TGraphErrors *h1C4oC2VsPhi1Bin = new TGraphErrors(1, &x1Bin, &C4oC2VsPhi1Bin[i], &x1err, NULL);
+      
       h1C4oC2VsPhi1Bin->SetLineColor(2);
       h1C4oC2VsPhi1Bin->SetMarkerSize(1);
       h1C4oC2VsPhi1Bin->SetMarkerStyle(20);
@@ -518,6 +524,8 @@ void netProton(TString outputplotsfolder = "outputFolder/")
       mg->Add(h1C4oC2VsPhi2Bin);
       mg->Add(h1C4oC2VsPhi3Bin);
       mg->Add(h1C4oC2VsPhi6Bin);
+      mg->SetTitle("C_{4}/C_{2}");
+      mg->GetXaxis()->SetTitle("#phi-#psi_{RP}");
       mg->Draw("zpA");
       c1->Size(0, 0);
       c1->SaveAs(Form(outputplotsfolder + "%d/h1C4oC2VsPhiCentral.png", i));

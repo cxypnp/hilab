@@ -117,10 +117,10 @@ f14::f14(TTree *tree) : fChain(0)
    // used to generate this class and read the Tree.
    if (tree == 0)
    {
-      TFile *f = (TFile *)gROOT->GetListOfFiles()->FindObject("f14_ecm007.70_imp12.48_3.dat.root");
+      TFile *f = (TFile *)gROOT->GetListOfFiles()->FindObject("../dataSet/f14_ecm007.70_imp12.48_3.dat.root");
       if (!f || !f->IsOpen())
       {
-         f = new TFile("f14_ecm007.70_imp12.48_3.dat.root");
+         f = new TFile("../dataSet/f14_ecm007.70_imp12.48_3.dat.root");
       }
       f->GetObject("f14", tree);
    }

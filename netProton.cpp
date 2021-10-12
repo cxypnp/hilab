@@ -41,9 +41,8 @@ void centralityBound(double *centraclityNchg, TH1D *refmult3)
    }
 }
 
-void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgNppPhi3Bin, TH2F **h2NcgNppPhi6Bin, bool reconstruction)
+void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgNppPhi3Bin, TH2F **h2NcgNppPhi6Bin,TH2F *h2EventPlane, bool reconstruction)
 {
-   TH1F *h1EventPlane = new TH1F("h1EventPlane", "h1EventPlane", 1000, -TMath::Pi(), TMath::Pi());
    TTree *event = NULL;
 
    f14 reader(event);
@@ -63,7 +62,8 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
       int _nNetProton = 0;
       int _nCharged = 0;
       int _nTotalCharged = 0;
-      double sumQx = 0, sumQy = 0;
+      double sumQxP = 0, sumQyP = 0;
+      double sumQxM = 0, sumQyM = 0;
       nb = reader.fChain->GetEntry(jentry);
       nbytes += nb;
 
@@ -80,6 +80,8 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
          if ((reader.fTracksOut_chg[j] != 0))
          {
             float pT = TMath::Sqrt(reader.fTracksOut_px[j] * reader.fTracksOut_px[j] + reader.fTracksOut_py[j] * reader.fTracksOut_py[j]);
+            float p = TMath::Sqrt(reader.fTracksOut_px[j] * reader.fTracksOut_px[j] + reader.fTracksOut_py[j] * reader.fTracksOut_py[j] + reader.fTracksOut_pz[j] * reader.fTracksOut_pz[j]);
+            float eta = 0.5 * log((p + reader.fTracksOut_pz[j]) / (p - reader.fTracksOut_pz[j]));
             // Is it (anti-)proton?
             if ((reader.fTracksOut_ityp[j] == 1) || (reader.fTracksOut_ityp[j] == -1))
             {
@@ -96,28 +98,43 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
             else
             {
                // Other Particle
-               float p = TMath::Sqrt(reader.fTracksOut_px[j] * reader.fTracksOut_px[j] + reader.fTracksOut_py[j] * reader.fTracksOut_py[j] + reader.fTracksOut_pz[j] * reader.fTracksOut_pz[j]);
-               float eta = 0.5 * log((p + reader.fTracksOut_pz[j]) / (p - reader.fTracksOut_pz[j]));
                if (TMath::Abs(eta) < 1 && pT > 0.1)
                {
                   _nCharged++;
                }
             }
-            sumQx += pT * cos(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
-            sumQy += pT * sin(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
+            if (fabs(eta)>0.05)
+            {
+               if (eta>0)
+               {
+                  sumQxP += pT * cos(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
+                  sumQyP += pT * sin(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
+               }
+               else
+               {  
+                  sumQxM += pT * cos(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
+                  sumQyM += pT * sin(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
+               }
+            }
             _nTotalCharged++;
          }
       }
       // Event Plane Psi2
-      double Psi;
+      double PsiP;
+      double PsiM;
       // Make Psi in 0, pi
-      if (atan2(sumQy, sumQx) > 0)
-         Psi = 0.5 * atan2(sumQy, sumQx);
+      if (atan2(sumQyP, sumQxP) > 0)
+         PsiP = 0.5 * atan2(sumQyP, sumQxP);
       else
-         Psi = 0.5 * (atan2(sumQy, sumQx) + 2 * TMath::Pi());
-      // Fill the distribution
-      h1EventPlane->Fill(atan2(sumQy, sumQx));
+         PsiP = 0.5 * (atan2(sumQyP, sumQxP) + 2 * TMath::Pi());
 
+      if (atan2(sumQyM, sumQxM) > 0)
+         PsiM = 0.5 * atan2(sumQyM, sumQxM);
+      else
+         PsiM = 0.5 * (atan2(sumQyM, sumQxM) + 2 * TMath::Pi());
+         
+      // Fill the distribution
+      h2EventPlane->Fill(cos(2*(PsiP-PsiM)),_nCharged);
       h2NcgNppPhi1Bin->Fill(_nNetProton, _nCharged);
       // Have known the Ncg and Npp, fill the h2 with the phi of every particle
       int _nNetProtonPhi[6] = {0, 0, 0, 0, 0, 0};
@@ -131,12 +148,23 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
             {
                // (anti-)proton
                float pT = TMath::Sqrt(reader.fTracksOut_px[j] * reader.fTracksOut_px[j] + reader.fTracksOut_py[j] * reader.fTracksOut_py[j]);
+               float p = TMath::Sqrt(reader.fTracksOut_px[j] * reader.fTracksOut_px[j] + reader.fTracksOut_py[j] * reader.fTracksOut_py[j] + reader.fTracksOut_pz[j] * reader.fTracksOut_pz[j]);
                float y = 0.5 * log((reader.fTracksOut_p0[j] + reader.fTracksOut_pz[j]) / (reader.fTracksOut_p0[j] - reader.fTracksOut_pz[j]));
+               float eta = 0.5 * log((p + reader.fTracksOut_pz[j]) / (p - reader.fTracksOut_pz[j]));
                if (TMath::Abs(y) < 0.5 && pT < 2.0 && pT > 0.4)
                {
                   int index = 0;
+                  double Psi=0;
                   if (reconstruction)
                   {
+                     if (eta>0)
+                     {
+                        Psi=PsiM;
+                     }
+                     else
+                     {
+                        Psi=PsiP;
+                     }
                      index = (int)(atan(fabs((reader.fTracksOut_ry[j] * cos(Psi) - reader.fTracksOut_rx[j] * sin(Psi)) / (reader.fTracksOut_rx[j] * cos(Psi) + reader.fTracksOut_ry[j] * sin(Psi)))) / (TMath::Pi() * 1.0 / 12));
                   }
                   else
@@ -168,11 +196,7 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
          h2NcgNppPhi6Bin[j]->Fill(_nNetProtonPhi[j], _nCharged);
       }
    }
-   TCanvas *cTemp = new TCanvas();
-   h1EventPlane->Draw();
-   h1EventPlane->SaveAs("eventPlane.root");
-   h1EventPlane->GetXaxis()->SetTitle("#psi_{2}-#psi_{RP}");
-   cTemp->SaveAs("h1EventPlane.png");
+   
 }
 
 TH3I *drawEvent()
@@ -268,6 +292,53 @@ void getCumulants(TH2F *h2NcgNpp, double *C1, double *C2, double *C3, double *C4
    }
 }
 
+void calcResolution(TH2F *h2EventPlane, double *centraclityNchg,double *Resolution)
+{
+   int binMax, binMin;
+   int sum;
+   double mean[9] = {0,0,0,0,0,0,0,0,0};
+   // For centain phi, calculate Ci
+   // CBWM included
+   for (int l = 0; l < 9; l++)
+   {
+      sum = 0;
+      if (l == 0)
+      {
+         binMin = h2EventPlane->ProjectionY()->GetBin(centraclityNchg[l]);
+         binMax = h2EventPlane->ProjectionY()->GetMinimumBin();
+      }
+      else
+      {
+         binMin = h2EventPlane->ProjectionY()->GetBin(centraclityNchg[l]);
+         binMax = h2EventPlane->ProjectionY()->GetBin(centraclityNchg[l - 1]);
+      }
+      // Loop on every centrality bin and do the modification
+      for (int j = binMin; j < binMax; j++)
+      {
+         TH1D *_eventPlaneDist = h2EventPlane->ProjectionX("", j, j);
+
+         int nEvents = _eventPlaneDist->Integral();
+
+         if (nEvents == 0 or nEvents == 1)
+            continue;
+
+         float _mean = 0;
+         if(!(_eventPlaneDist->GetMean()<0))
+            _mean = sqrt(_eventPlaneDist->GetMean());
+         else
+            {
+               cout << "ERROR"<< endl;
+               continue;
+            }
+         mean[l] += nEvents * _mean;
+         sum += nEvents;
+      }
+      Resolution[l] = mean[l] / sum;
+   }
+   
+}
+
+
 void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionRP = true)
 {
    system("rm -rf " + outputplotsfolder);
@@ -291,6 +362,7 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
    TH2F *h2NcgNppPhi3Bin[3];
    TH2F *h2NcgNppPhi2Bin[2];
    TH2F *h2NcgNppPhi1Bin = NULL;
+   TH2F *h2EventPlane=NULL;
 
    f.GetObject("h2NcgNppPhi1Bin", h2NcgNppPhi1Bin);
    for (int i = 0; i < 6; i++)
@@ -332,13 +404,19 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
          h2NcgNppPhi6Bin[i]->GetXaxis()->SetTitle("Net-Proton");
          h2NcgNppPhi6Bin[i]->GetZaxis()->SetTitle("#phi");
       }
-      fillHistograms(h2NcgNppPhi1Bin, h2NcgNppPhi2Bin, h2NcgNppPhi3Bin, h2NcgNppPhi6Bin, reconstructionRP);
+      h2EventPlane = new TH2F("h2EventPlane", "h2EventPlane", 1000, -1, 1, 450, -0.5, 449.5);
+      fillHistograms(h2NcgNppPhi1Bin, h2NcgNppPhi2Bin, h2NcgNppPhi3Bin, h2NcgNppPhi6Bin, h2EventPlane, reconstructionRP);
+      h2EventPlane->GetXaxis()->SetTitle("cos 2(#psi_{2#eta+}-#psi_{2#eta-})");
+      h2EventPlane->Draw();
+      c1->SaveAs("h2EventPlane.png");
    }
 
    double centraclityNchg[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+   double resolution[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
    centralityBound(centraclityNchg, h2NcgNppPhi1Bin->ProjectionY());
    TFile *hfile = TFile::Open("outputFile.root", "RECREATE");
-
+   h2EventPlane->Write();
+   calcResolution(h2EventPlane,centraclityNchg,resolution);
    h2NcgNppPhi1Bin->Write();
    h2NcgNppPhi1Bin->Draw("COLZ");
    c1->SaveAs("h2NcgNppPhi1Bin.png");
@@ -361,19 +439,33 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
          c1->SaveAs(Form(outputplotsfolder + "h2NcgNppPhi6Bin%d.png", i));
       }
 
-   // ofstream logOut;
-   // logOut.open(outputplotsfolder + "run.log", ios_base::app);
-   // for (int l = 0; l < 9; l++)
-   // {
-   //    if (l == 0)
-   //    {
-   //       logOut << 5 << "%-10%:" << centraclityNchg[l] << endl;
-   //    }
-   //    else
-   //    {
-   //       logOut << l * 10 << "%" << centraclityNchg[l] << endl;
-   //    }
-   // }
+   ofstream logOut;
+   logOut.open(outputplotsfolder + "centraclityNchg.log", ios_base::app);
+   logOut << "centraclityNchg.log" <<endl;
+   for (int l = 0; l < 9; l++)
+   {
+      if (l == 0)
+      {
+         logOut << 5 << "%-10%:" << centraclityNchg[l] << endl;
+      }
+      else
+      {
+         logOut << l * 10 << "%" << centraclityNchg[l] << endl;
+      }
+   }
+
+      logOut << "resolution.log" <<endl;
+   for (int l = 0; l < 9; l++)
+   {
+      if (l == 0)
+      {
+         logOut << 5 << "%-10%:" << resolution[l] << endl;
+      }
+      else
+      {
+         logOut << l * 10 << "%" << resolution[l] << endl;
+      }
+   }
 
    // Loop on every angle
 

@@ -57,8 +57,6 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
       {
          cout << "Progress %:" << jentry * 1.0 / nentries * 100 << endl;
       }
-      // if (jentry==30000)
-         // break;
       Long64_t ientry = reader.LoadTree(jentry);
       if (ientry < 0)
          break;
@@ -422,7 +420,7 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
             h2NcgNppPhi3Bin[i]->GetXaxis()->SetTitle("Net-Proton");
             h2NcgNppPhi3Bin[i]->GetZaxis()->SetTitle("#phi");
          }
-         h2NcgNppPhi6Bin[i] = new TH2F(Form("h2NcgNppPhi%d", i), Form("h2NcgNppPhi%d", i), 100, -5.5, 94.5, 450, -0.5, 449.5);
+         h2NcgNppPhi6Bin[i] = new TH2F(Form("h2NcgNppPhi6Bin%d", i), Form("h2NcgNppPhi6Bin%d", i), 100, -5.5, 94.5, 450, -0.5, 449.5);
          h2NcgNppPhi6Bin[i]->GetYaxis()->SetTitle("Charged Multiplicity");
          h2NcgNppPhi6Bin[i]->GetXaxis()->SetTitle("Net-Proton");
          h2NcgNppPhi6Bin[i]->GetZaxis()->SetTitle("#phi");
@@ -435,7 +433,7 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
    }
 
    double centralityNchg[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-   double resolution[3] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+   double resolution[3] = {0, 0, 0};
    centralityBound(centralityNchg, h2NcgNppPhi1Bin->ProjectionY());
    TFile *hfile = TFile::Open("outputFile.root", "RECREATE");
    h2EventPlane->Write();
@@ -508,8 +506,6 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
 
    // Loop on every angle
 
-   h2NcgNppPhi1Bin->Write();
-
    double x1Bin = 0.5 * TMath::Pi() / 2;
    double x1err = 0.5 * TMath::Pi() / 2;
    double x2Bin[2] = {0.125 * TMath::Pi(), 0.375 * TMath::Pi()};
@@ -553,7 +549,6 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
          C3oC2VsPhi6Bin[j][i] = C3oC2[j];
          C4oC2VsPhi6Bin[j][i] = C4oC2[j];
       }
-      h2NcgNppPhi6Bin[i]->Write();
    }
 
    // 3 Bins
@@ -574,7 +569,6 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
          C3oC2VsPhi3Bin[j][i] = C3oC2[j];
          C4oC2VsPhi3Bin[j][i] = C4oC2[j];
       }
-      h2NcgNppPhi3Bin[i]->Write();
    }
 
    // 2 Bins
@@ -595,7 +589,6 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
          C3oC2VsPhi2Bin[j][i] = C3oC2[j];
          C4oC2VsPhi2Bin[j][i] = C4oC2[j];
       }
-      h2NcgNppPhi2Bin[i]->Write();
    }
 
    double C1[3] = {0}, C2[3] = {0}, C3[3] = {0}, C4[3] = {0};
@@ -749,6 +742,6 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
    int ybins = h2NcgNppPhi1Bin->GetYaxis()->GetNbins();
 
    // drawEvent()->Write();
-   hfile->Write();
+   // hfile->Write();
    hfile->Close();
 }

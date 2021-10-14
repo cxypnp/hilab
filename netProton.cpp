@@ -15,7 +15,7 @@
 #include "TMultiGraph.h"
 using namespace std;
 
-void centralityBound(double *centraclityNchg, TH1D *refmult3)
+void centralityBound(double *centralityNchg, TH1D *refmult3)
 {
    TH1 *cumul = refmult3->GetCumulative(false);
    cumul->Scale(1.0 / refmult3->Integral());
@@ -27,14 +27,14 @@ void centralityBound(double *centraclityNchg, TH1D *refmult3)
          {
             if (cumul->GetBinContent(k) > 0.05)
             {
-               centraclityNchg[0] = cumul->GetBinLowEdge(k);
+               centralityNchg[0] = cumul->GetBinLowEdge(k);
             }
          }
          else
          {
             if (cumul->GetBinContent(k) > l * 0.1)
             {
-               centraclityNchg[l] = cumul->GetBinLowEdge(k);
+               centralityNchg[l] = cumul->GetBinLowEdge(k);
             }
          }
       }
@@ -235,25 +235,33 @@ TH3I *drawEvent()
    return particles;
 }
 
-void getCumulants(TH2F *h2NcgNpp, double *C1, double *C2, double *C3, double *C4, double *centraclityNchg)
+void getCumulants(TH2F *h2NcgNpp, double *C1, double *C2, double *C3, double *C4, double *centralityNchg)
 {
    int binMax, binMin;
    int sum;
-   double mean[9] = {0}, sigma[9] = {0}, fS[9] = {0}, kappa[9] = {0};
+   double mean[3] = {0}, sigma[3] = {0}, fS[3] = {0}, kappa[3] = {0};
    // For centain phi, calculate Ci
    // CBWM included
-   for (int l = 0; l < 9; l++)
+   for (int l = 0; l < 3; l++)
    {
       sum = 0;
       if (l == 0)
       {
-         binMin = h2NcgNpp->ProjectionY()->GetBin(centraclityNchg[l]);
+         // 0-10%, Set from centralityNchg to MinBin
+         binMin = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[1]);
          binMax = h2NcgNpp->ProjectionY()->GetMinimumBin();
       }
-      else
+      else if (l == 1)
       {
-         binMin = h2NcgNpp->ProjectionY()->GetBin(centraclityNchg[l]);
-         binMax = h2NcgNpp->ProjectionY()->GetBin(centraclityNchg[l - 1]);
+         // 10-60%, Set from centralityNchg to MinBin
+         binMin = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[6]);
+         binMax = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[1]);
+      }
+      else if (l == 2)
+      {
+         // 10-60%, Set from centralityNchg to MinBin
+         binMin = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[8]);
+         binMax = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[6]);
       }
       // Loop on every centrality bin and do the modification
       for (int j = binMin; j < binMax; j++)
@@ -299,25 +307,33 @@ void getCumulants(TH2F *h2NcgNpp, double *C1, double *C2, double *C3, double *C4
    }
 }
 
-void calcResolution(TH2F *h2EventPlane, double *centraclityNchg,double *Resolution)
+void calcResolution(TH2F *h2EventPlane, double *centralityNchg,double *Resolution)
 {
    int binMax, binMin;
    int sum;
-   double mean[9] = {0,0,0,0,0,0,0,0,0};
+   double mean[3] = {0,0,0};
    // For centain phi, calculate Ci
-   // CBWM included
-   for (int l = 0; l < 9; l++)
+   // CBWM include
+   for (int l = 0; l < 3; l++)
    {
       sum = 0;
       if (l == 0)
       {
-         binMin = h2EventPlane->ProjectionY()->GetBin(centraclityNchg[l]);
+         // 0-10%, Set from centralityNchg to MinBin
+         binMin = h2EventPlane->ProjectionY()->GetBin(centralityNchg[1]);
          binMax = h2EventPlane->ProjectionY()->GetMinimumBin();
       }
-      else
+      else if (l == 1)
       {
-         binMin = h2EventPlane->ProjectionY()->GetBin(centraclityNchg[l]);
-         binMax = h2EventPlane->ProjectionY()->GetBin(centraclityNchg[l - 1]);
+         // 10-60%, Set from centralityNchg to MinBin
+         binMin = h2EventPlane->ProjectionY()->GetBin(centralityNchg[6]);
+         binMax = h2EventPlane->ProjectionY()->GetBin(centralityNchg[1]);
+      }
+      else if (l == 2)
+      {
+         // 10-60%, Set from centralityNchg to MinBin
+         binMin = h2EventPlane->ProjectionY()->GetBin(centralityNchg[8]);
+         binMax = h2EventPlane->ProjectionY()->GetBin(centralityNchg[6]);
       }
       // Loop on every centrality bin and do the modification
       for (int j = binMin; j < binMax; j++)
@@ -342,7 +358,6 @@ void calcResolution(TH2F *h2EventPlane, double *centraclityNchg,double *Resoluti
       }
       Resolution[l] = mean[l] / sum;
    }
-   
 }
 
 
@@ -350,7 +365,7 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
 {
    system("rm -rf " + outputplotsfolder);
    system("mkdir -p " + outputplotsfolder);
-   for (int i = 0; i < 9; i++)
+   for (int i = 0; i < 3; i++)
    {
       system(Form("mkdir -p " + outputplotsfolder + "/%d", i));
       system(Form("mkdir -p " + outputplotsfolder + "/%d", i));
@@ -372,6 +387,7 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
    TH2F *h2EventPlane=NULL;
 
    f.GetObject("h2NcgNppPhi1Bin", h2NcgNppPhi1Bin);
+   f.GetObject("h2EventPlane", h2EventPlane);
    for (int i = 0; i < 6; i++)
    {
       if (i < 3)
@@ -418,12 +434,12 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
       c1->SaveAs("h2EventPlane.png");
    }
 
-   double centraclityNchg[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-   double resolution[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-   centralityBound(centraclityNchg, h2NcgNppPhi1Bin->ProjectionY());
+   double centralityNchg[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+   double resolution[3] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+   centralityBound(centralityNchg, h2NcgNppPhi1Bin->ProjectionY());
    TFile *hfile = TFile::Open("outputFile.root", "RECREATE");
    h2EventPlane->Write();
-   calcResolution(h2EventPlane,centraclityNchg,resolution);
+   calcResolution(h2EventPlane,centralityNchg,resolution);
    h2NcgNppPhi1Bin->Write();
    h2NcgNppPhi1Bin->Draw("COLZ");
    c1->SaveAs("h2NcgNppPhi1Bin.png");
@@ -447,30 +463,46 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
       }
 
    ofstream logOut;
-   logOut.open(outputplotsfolder + "centraclityNchg.log", ios_base::app);
-   logOut << "centraclityNchg.log" <<endl;
+   logOut.open(outputplotsfolder + "centralityNchg.log", ios_base::app);
+   logOut << "centralityNchg.log" <<endl;
    for (int l = 0; l < 9; l++)
    {
       if (l == 0)
       {
-         logOut << 5 << "%-10%:" << centraclityNchg[l] << endl;
+         logOut << 5 << "%-10%:" << centralityNchg[l] << endl;
       }
       else
       {
-         logOut << l * 10 << "%" << centraclityNchg[l] << endl;
+         logOut << l * 10 << "%" << centralityNchg[l] << endl;
       }
    }
 
       logOut << "resolution.log" <<endl;
-   for (int l = 0; l < 9; l++)
+   // for (int l = 0; l < 9; l++)
+   // {
+   //    if (l == 0)
+   //    {
+   //       logOut << 5 << "%-10%:" << resolution[l] << endl;
+   //    }
+   //    else
+   //    {
+   //       logOut << l * 10 << "%" << resolution[l] << endl;
+   //    }
+   // }
+
+      for (int l = 0; l < 3; l++)
    {
       if (l == 0)
       {
-         logOut << 5 << "%-10%:" << resolution[l] << endl;
+         logOut << "0-10%:" << resolution[l] << endl;
       }
-      else
+      else if (l == 1)
       {
-         logOut << l * 10 << "%" << resolution[l] << endl;
+         logOut << "10-60%" << resolution[l] << endl;
+      }
+      else if (l == 2)
+      {
+         logOut << "60-80%" << resolution[l] << endl;
       }
    }
 
@@ -487,35 +519,35 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
    double x6Bin[6] = {1.0 * TMath::Pi() / 24, 3.0 * TMath::Pi() / 24, 5.0 * TMath::Pi() / 24, 7.0 * TMath::Pi() / 24, 9.0 * TMath::Pi() / 24, 11.0 * TMath::Pi() / 24};
    double x6err[6] = {1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24};
 
-   double C2oC1VsPhi6Bin[9][6];
-   double C3oC2VsPhi6Bin[9][6];
-   double C4oC2VsPhi6Bin[9][6];
+   double C2oC1VsPhi6Bin[3][6];
+   double C3oC2VsPhi6Bin[3][6];
+   double C4oC2VsPhi6Bin[3][6];
 
-   double C2oC1VsPhi3Bin[9][3];
-   double C3oC2VsPhi3Bin[9][3];
-   double C4oC2VsPhi3Bin[9][3];
+   double C2oC1VsPhi3Bin[3][3];
+   double C3oC2VsPhi3Bin[3][3];
+   double C4oC2VsPhi3Bin[3][3];
 
-   double C2oC1VsPhi2Bin[9][2];
-   double C3oC2VsPhi2Bin[9][2];
-   double C4oC2VsPhi2Bin[9][2];
+   double C2oC1VsPhi2Bin[3][2];
+   double C3oC2VsPhi2Bin[3][2];
+   double C4oC2VsPhi2Bin[3][2];
 
-   double C2oC1VsPhi1Bin[9];
-   double C3oC2VsPhi1Bin[9];
-   double C4oC2VsPhi1Bin[9];
+   double C2oC1VsPhi1Bin[3];
+   double C3oC2VsPhi1Bin[3];
+   double C4oC2VsPhi1Bin[3];
 
    // 6 Bins
    for (int i = 0; i < 6; i++)
    {
-      double C1[9] = {0}, C2[9] = {0}, C3[9] = {0}, C4[9] = {0};
-      double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
-      getCumulants(h2NcgNppPhi6Bin[i], C1, C2, C3, C4, centraclityNchg);
-      for (int l = 0; l < 9; l++)
+      double C1[3] = {0}, C2[3] = {0}, C3[3] = {0}, C4[3] = {0};
+      double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
+      getCumulants(h2NcgNppPhi6Bin[i], C1, C2, C3, C4, centralityNchg);
+      for (int l = 0; l < 3; l++)
       {
          C2oC1[l] = C2[l] / C1[l];
          C3oC2[l] = C3[l] / C2[l];
          C4oC2[l] = C4[l] / C2[l];
       }
-      for (int j = 0; j < 9; j++)
+      for (int j = 0; j < 3; j++)
       {
          C2oC1VsPhi6Bin[j][i] = C2oC1[j];
          C3oC2VsPhi6Bin[j][i] = C3oC2[j];
@@ -527,16 +559,16 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
    // 3 Bins
    for (int i = 0; i < 3;i++)
    {
-      double C1[9] = {0}, C2[9] = {0}, C3[9] = {0}, C4[9] = {0};
-      double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
-      getCumulants(h2NcgNppPhi3Bin[i], C1, C2, C3, C4, centraclityNchg);
-      for (int l = 0; l < 9; l++)
+      double C1[3] = {0}, C2[3] = {0}, C3[3] = {0}, C4[3] = {0};
+      double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
+      getCumulants(h2NcgNppPhi3Bin[i], C1, C2, C3, C4, centralityNchg);
+      for (int l = 0; l < 3; l++)
       {
          C2oC1[l] = C2[l] / C1[l];
          C3oC2[l] = C3[l] / C2[l];
          C4oC2[l] = C4[l] / C2[l];
       }
-      for (int j = 0; j < 9; j++)
+      for (int j = 0; j < 3; j++)
       {
          C2oC1VsPhi3Bin[j][i] = C2oC1[j];
          C3oC2VsPhi3Bin[j][i] = C3oC2[j];
@@ -548,16 +580,16 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
    // 2 Bins
    for (int i = 0; i < 2;i++)
    {
-      double C1[9] = {0}, C2[9] = {0}, C3[9] = {0}, C4[9] = {0};
-      double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
-      getCumulants(h2NcgNppPhi2Bin[i], C1, C2, C3, C4, centraclityNchg);
-      for (int l = 0; l < 9; l++)
+      double C1[3] = {0}, C2[3] = {0}, C3[3] = {0}, C4[3] = {0};
+      double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
+      getCumulants(h2NcgNppPhi2Bin[i], C1, C2, C3, C4, centralityNchg);
+      for (int l = 0; l < 3; l++)
       {
          C2oC1[l] = C2[l] / C1[l];
          C3oC2[l] = C3[l] / C2[l];
          C4oC2[l] = C4[l] / C2[l];
       }
-      for (int j = 0; j < 9; j++)
+      for (int j = 0; j < 3; j++)
       {
          C2oC1VsPhi2Bin[j][i] = C2oC1[j];
          C3oC2VsPhi2Bin[j][i] = C3oC2[j];
@@ -566,23 +598,23 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
       h2NcgNppPhi2Bin[i]->Write();
    }
 
-   double C1[9] = {0}, C2[9] = {0}, C3[9] = {0}, C4[9] = {0};
-   double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
-   getCumulants(h2NcgNppPhi1Bin, C1, C2, C3, C4, centraclityNchg);
-   for (int l = 0; l < 9; l++)
+   double C1[3] = {0}, C2[3] = {0}, C3[3] = {0}, C4[3] = {0};
+   double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
+   getCumulants(h2NcgNppPhi1Bin, C1, C2, C3, C4, centralityNchg);
+   for (int l = 0; l < 3; l++)
    {
       C2oC1[l] = C2[l] / C1[l];
       C3oC2[l] = C3[l] / C2[l];
       C4oC2[l] = C4[l] / C2[l];
    }
-   for (int j = 0; j < 9; j++)
+   for (int j = 0; j < 3; j++)
    {
       C2oC1VsPhi1Bin[j] = C2oC1[j];
       C3oC2VsPhi1Bin[j] = C3oC2[j];
       C4oC2VsPhi1Bin[j] = C4oC2[j];
    }
 
-   for (int i = 0; i < 9; i++)
+   for (int i = 0; i < 3; i++)
    {
       c1->Clear();
       TGraphErrors *h1C2oC1VsPhi1Bin = new TGraphErrors(1, &x1Bin, &C2oC1VsPhi1Bin[i], &x1err, NULL);

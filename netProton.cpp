@@ -103,7 +103,7 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
                   _nCharged++;
                }
             }
-            if (fabs(eta)>0.05)
+            if (fabs(eta)>0.05 && pT>0.2 && pT<2 && fabs(eta)<1)
             {
                if (eta>0)
                {

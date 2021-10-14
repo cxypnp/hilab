@@ -47,15 +47,18 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
 
    f14 reader(event);
 
-   Long64_t nentries = reader.fChain->GetEntriesFast();
-
+   Long64_t nentries = reader.fChain->GetEntries();
+   cout << nentries << endl;
    Long64_t nbytes = 0, nb = 0;
+   int eventCounter=0;
    for (Long64_t jentry = 0; jentry < nentries; jentry++)
    {
       if (jentry % 50000 == 0)
       {
-         cout << "Progress:" << jentry * 1.0 / nentries * 100 << endl;
+         cout << "Progress %:" << jentry * 1.0 / nentries * 100 << endl;
       }
+      // if (jentry==30000)
+         // break;
       Long64_t ientry = reader.LoadTree(jentry);
       if (ientry < 0)
          break;
@@ -71,6 +74,10 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
       if (reader.fColHdr_timestep != 200 || reader.fColHdr_Ntrack == 0)
       {
          continue;
+      }
+      else
+      {
+         eventCounter++;
       }
 
       // Read a Event, Determine the Centrality and Event plane of this event
@@ -196,7 +203,7 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
          h2NcgNppPhi6Bin[j]->Fill(_nNetProtonPhi[j], _nCharged);
       }
    }
-   
+   cout << eventCounter << " events processed" <<endl;
 }
 
 TH3I *drawEvent()

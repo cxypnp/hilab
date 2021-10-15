@@ -51,12 +51,14 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
    cout << nentries << endl;
    Long64_t nbytes = 0, nb = 0;
    int eventCounter=0;
+
    for (Long64_t jentry = 0; jentry < nentries; jentry++)
    {
       if (jentry % 50000 == 0)
       {
          cout << "Progress %:" << jentry * 1.0 / nentries * 100 << endl;
       }
+
       Long64_t ientry = reader.LoadTree(jentry);
       if (ientry < 0)
          break;
@@ -233,13 +235,59 @@ TH3I *drawEvent()
    return particles;
 }
 
-void getCumulants(TH2F *h2NcgNpp, double *C1, double *C2, double *C3, double *C4, double *centralityNchg)
+void getMoments(TH1D *netProtonDist,double *moments)
+{
+   // Loop on bins (possibly including underflows/overflows)
+   Int_t binx;
+   Double_t w;
+   Double_t x;
+   Int_t firstBinX =netProtonDist->GetXaxis()->GetFirst();
+   Int_t lastBinX  =netProtonDist->GetXaxis()->GetLast();
+
+   double mean=netProtonDist->GetMean();
+   
+   int sum=0;
+   for (binx = firstBinX; binx <= lastBinX; binx++) {
+      x   = netProtonDist->GetXaxis()->GetBinCenter(binx);
+      w   = netProtonDist->GetBinContent(binx);
+      sum+=w;
+      moments[2]   += 1.0*w*pow((x-mean),2);
+      moments[3]   += 1.0*w*pow((x-mean),3);
+      moments[4]   += w*pow((x-mean),4);
+      moments[5]   += w*pow((x-mean),5);
+      moments[6]   += w*pow((x-mean),6);
+      moments[7]   += w*pow((x-mean),7);
+      moments[8]   += w*pow((x-mean),8);
+   } 
+   for (int i = 2; i < 9; i++)
+   {
+      moments[i]=moments[i]/sum;
+   }
+}
+
+double varC2oC1(double *moments,double mean, int events)
+{
+   return (-(moments[2]*moments[2])/(mean*mean)+moments[4]/(mean*mean)-(2*moments[2]*moments[3])/(mean*mean*mean)+(moments[2]*moments[2]*moments[2])/(mean*mean*mean*mean))/(1.0*events);
+}
+
+double varC3oC2(double *moments,double mean, int events)
+{
+   return (9.0*moments[2]-(6.0*moments[4])/moments[2]+(6.0*moments[3]*moments[3])/(moments[2]*moments[2])+moments[6]/(moments[2]*moments[2])-(2.0*moments[3]*moments[5])/(moments[2]*moments[2]*moments[2])+moments[3]*moments[3]*moments[4]/(moments[2]*moments[2]*moments[2]*moments[2]))/(1.0*events);
+}
+
+double varC4oC2(double *moments,double mean, int events)
+{
+   return (-9.0*moments[2]*moments[2]+9.0*moments[4]+40.0*moments[3]*moments[3]/moments[2]-6.0*moments[6]/moments[2]-8.0*moments[3]*moments[5]/(moments[2]*moments[2])+6.0*moments[4]*moments[4]/(moments[2]*moments[2])+moments[8]/(moments[2]*moments[2])+8.0*moments[3]*moments[3]*moments[4]/(moments[2]*moments[2]*moments[2])-2.0*moments[4]*moments[6]/(moments[2]*moments[2]*moments[2])+moments[4]*moments[4]*moments[4]/(moments[2]*moments[2]*moments[2]*moments[2]))/(1.0*events);
+}
+
+void getCumulants(TH2F *h2NcgNpp, double *C2oC1, double *C3oC2, double *C4oC2, double *eC2oC1, double *eC3oC2, double *eC4oC2, double *centralityNchg)
 {
    int binMax, binMin;
    int sum;
-   double mean[3] = {0}, sigma[3] = {0}, fS[3] = {0}, kappa[3] = {0};
+
    // For centain phi, calculate Ci
    // CBWM included
+   double C1[3]={0,0,0}, C2[3]={0,0,0}, C3[3]={0,0,0}, C4[3]={0,0,0};
    for (int l = 0; l < 3; l++)
    {
       sum = 0;
@@ -264,6 +312,7 @@ void getCumulants(TH2F *h2NcgNpp, double *C1, double *C2, double *C3, double *C4
       // Loop on every centrality bin and do the modification
       for (int j = binMin; j < binMax; j++)
       {
+         
          TH1D *_netProtonDist = h2NcgNpp->ProjectionX("", j, j);
          int nEvents = _netProtonDist->Integral();
 
@@ -278,30 +327,44 @@ void getCumulants(TH2F *h2NcgNpp, double *C1, double *C2, double *C3, double *C4
          {
             _fS = 0;
             cout << "omitEvent: " << nEvents << endl;
+            continue;
          }
          _kappa = _netProtonDist->GetKurtosis();
          if (isnan(_kappa))
          {
             _kappa = 0;
             cout << "omitEvent: " << nEvents << endl;
+            continue;
          }
 
-         mean[l] += nEvents * _mean;
-         sigma[l] += nEvents * _sigma;
-         fS[l] += nEvents * _fS;
-         kappa[l] += nEvents * _kappa;
+         C1[l] += nEvents*_mean;
+         C2[l] += nEvents*_sigma * _sigma;
+         C3[l] += nEvents*_fS *_sigma * _sigma *_sigma;
+         C4[l] += nEvents*_kappa * _sigma * _sigma * _sigma * _sigma;
+
+         double _moments[9]={0,0,0,0,0,0,0,0,0};
+         getMoments(_netProtonDist,_moments);
+         eC2oC1[l]+= nEvents*nEvents*varC2oC1(_moments,_mean,nEvents);
+         eC3oC2[l]+= nEvents*nEvents*varC3oC2(_moments,_mean,nEvents);
+         eC4oC2[l]+= nEvents*nEvents*varC4oC2(_moments,_mean,nEvents);
+
          sum += nEvents;
       }
 
-      mean[l] = mean[l] / sum;
-      sigma[l] = sigma[l] / sum;
-      fS[l] = fS[l] / sum;
-      kappa[l] = kappa[l] / sum;
+      C1[l]=C1[l]/sum;
+      C2[l]=C2[l]/sum;
+      C3[l]=C3[l]/sum;
+      C4[l]=C4[l]/sum;
 
-      C1[l] = mean[l];
-      C2[l] = sigma[l] * sigma[l];
-      C3[l] = fS[l] * C2[l] * sigma[l];
-      C4[l] = kappa[l] * sigma[l] * sigma[l] * sigma[l] * sigma[l];
+      // Weighted Ratios
+      C2oC1[l] = C2[l]/ C1[l];
+      C3oC2[l] = C3[l]/ C2[l];
+      C4oC2[l] = C4[l]/ C2[l];
+      cout << sum <<endl;
+
+      eC2oC1[l] = TMath::Sqrt(eC2oC1[l])/sum;
+      eC3oC2[l]= TMath::Sqrt(eC3oC2[l])/sum;
+      eC4oC2[l]=  TMath::Sqrt(eC4oC2[l])/sum;
    }
 }
 
@@ -365,10 +428,10 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
    system("mkdir -p " + outputplotsfolder);
    for (int i = 0; i < 3; i++)
    {
-      system(Form("mkdir -p " + outputplotsfolder + "/%d", i));
-      system(Form("mkdir -p " + outputplotsfolder + "/%d", i));
-      system(Form("mkdir -p " + outputplotsfolder + "/%d", i));
-      system(Form("mkdir -p " + outputplotsfolder + "/%d", i));
+      system(Form("mkdir -p " + outputplotsfolder + "%d", i));
+      system(Form("mkdir -p " + outputplotsfolder + "%d", i));
+      system(Form("mkdir -p " + outputplotsfolder + "%d", i));
+      system(Form("mkdir -p " + outputplotsfolder + "%d", i));
    }
 
    TCanvas *c1 = new TCanvas();
@@ -531,98 +594,111 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
    double C3oC2VsPhi1Bin[3];
    double C4oC2VsPhi1Bin[3];
 
+   double eC2oC1VsPhi6Bin[3][6];
+   double eC3oC2VsPhi6Bin[3][6];
+   double eC4oC2VsPhi6Bin[3][6];
+
+   double eC2oC1VsPhi3Bin[3][3];
+   double eC3oC2VsPhi3Bin[3][3];
+   double eC4oC2VsPhi3Bin[3][3];
+
+   double eC2oC1VsPhi2Bin[3][2];
+   double eC3oC2VsPhi2Bin[3][2];
+   double eC4oC2VsPhi2Bin[3][2];
+
+   double eC2oC1VsPhi1Bin[3];
+   double eC3oC2VsPhi1Bin[3];
+   double eC4oC2VsPhi1Bin[3];
+
+
    // 6 Bins
    for (int i = 0; i < 6; i++)
    {
-      double C1[3] = {0}, C2[3] = {0}, C3[3] = {0}, C4[3] = {0};
       double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
-      getCumulants(h2NcgNppPhi6Bin[i], C1, C2, C3, C4, centralityNchg);
-      for (int l = 0; l < 3; l++)
-      {
-         C2oC1[l] = C2[l] / C1[l];
-         C3oC2[l] = C3[l] / C2[l];
-         C4oC2[l] = C4[l] / C2[l];
-      }
+      double eC2oC1[3] = {0}, eC3oC2[3] = {0}, eC4oC2[3] = {0};
+      getCumulants(h2NcgNppPhi6Bin[i], C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
+
       for (int j = 0; j < 3; j++)
       {
          C2oC1VsPhi6Bin[j][i] = C2oC1[j];
          C3oC2VsPhi6Bin[j][i] = C3oC2[j];
          C4oC2VsPhi6Bin[j][i] = C4oC2[j];
+         
+         eC2oC1VsPhi6Bin[j][i] = eC2oC1[j];
+         eC3oC2VsPhi6Bin[j][i] = eC3oC2[j];
+         eC4oC2VsPhi6Bin[j][i] = eC4oC2[j];
       }
    }
 
    // 3 Bins
    for (int i = 0; i < 3;i++)
    {
-      double C1[3] = {0}, C2[3] = {0}, C3[3] = {0}, C4[3] = {0};
       double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
-      getCumulants(h2NcgNppPhi3Bin[i], C1, C2, C3, C4, centralityNchg);
-      for (int l = 0; l < 3; l++)
-      {
-         C2oC1[l] = C2[l] / C1[l];
-         C3oC2[l] = C3[l] / C2[l];
-         C4oC2[l] = C4[l] / C2[l];
-      }
+      double eC2oC1[3] = {0}, eC3oC2[3] = {0}, eC4oC2[3] = {0};
+      getCumulants(h2NcgNppPhi3Bin[i], C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
+
       for (int j = 0; j < 3; j++)
       {
          C2oC1VsPhi3Bin[j][i] = C2oC1[j];
          C3oC2VsPhi3Bin[j][i] = C3oC2[j];
          C4oC2VsPhi3Bin[j][i] = C4oC2[j];
+         
+         eC2oC1VsPhi3Bin[j][i] = eC2oC1[j];
+         eC3oC2VsPhi3Bin[j][i] = eC3oC2[j];
+         eC4oC2VsPhi3Bin[j][i] = eC4oC2[j];
       }
    }
 
    // 2 Bins
    for (int i = 0; i < 2;i++)
    {
-      double C1[3] = {0}, C2[3] = {0}, C3[3] = {0}, C4[3] = {0};
       double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
-      getCumulants(h2NcgNppPhi2Bin[i], C1, C2, C3, C4, centralityNchg);
-      for (int l = 0; l < 3; l++)
-      {
-         C2oC1[l] = C2[l] / C1[l];
-         C3oC2[l] = C3[l] / C2[l];
-         C4oC2[l] = C4[l] / C2[l];
-      }
+      double eC2oC1[3] = {0}, eC3oC2[3] = {0}, eC4oC2[3] = {0};
+      getCumulants(h2NcgNppPhi2Bin[i], C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
+
       for (int j = 0; j < 3; j++)
       {
          C2oC1VsPhi2Bin[j][i] = C2oC1[j];
          C3oC2VsPhi2Bin[j][i] = C3oC2[j];
          C4oC2VsPhi2Bin[j][i] = C4oC2[j];
+         
+         eC2oC1VsPhi2Bin[j][i] = eC2oC1[j];
+         eC3oC2VsPhi2Bin[j][i] = eC3oC2[j];
+         eC4oC2VsPhi2Bin[j][i] = eC4oC2[j];
       }
    }
 
-   double C1[3] = {0}, C2[3] = {0}, C3[3] = {0}, C4[3] = {0};
    double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
-   getCumulants(h2NcgNppPhi1Bin, C1, C2, C3, C4, centralityNchg);
-   for (int l = 0; l < 3; l++)
-   {
-      C2oC1[l] = C2[l] / C1[l];
-      C3oC2[l] = C3[l] / C2[l];
-      C4oC2[l] = C4[l] / C2[l];
-   }
+   double eC2oC1[3] = {0}, eC3oC2[3] = {0}, eC4oC2[3] = {0};
+   getCumulants(h2NcgNppPhi1Bin, C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
+
    for (int j = 0; j < 3; j++)
    {
       C2oC1VsPhi1Bin[j] = C2oC1[j];
       C3oC2VsPhi1Bin[j] = C3oC2[j];
       C4oC2VsPhi1Bin[j] = C4oC2[j];
+   
+      eC2oC1VsPhi1Bin[j] = eC2oC1[j];
+      eC3oC2VsPhi1Bin[j] = eC3oC2[j];
+      eC4oC2VsPhi1Bin[j] = eC4oC2[j];
    }
 
    for (int i = 0; i < 3; i++)
    {
       c1->Clear();
-      TGraphErrors *h1C2oC1VsPhi1Bin = new TGraphErrors(1, &x1Bin, &C2oC1VsPhi1Bin[i], &x1err, NULL);
+      TGraphErrors *h1C2oC1VsPhi1Bin = new TGraphErrors(1, &x1Bin, &C2oC1VsPhi1Bin[i], &x1err, eC2oC1VsPhi1Bin);
       h1C2oC1VsPhi1Bin->SetLineColor(2);
       h1C2oC1VsPhi1Bin->SetMarkerSize(1);
       h1C2oC1VsPhi1Bin->SetMarkerStyle(20);
-      TGraphErrors *h1C2oC1VsPhi2Bin = new TGraphErrors(2, x2Bin, C2oC1VsPhi2Bin[i], x2err, NULL);
+      TGraphErrors *h1C2oC1VsPhi2Bin = new TGraphErrors(2, x2Bin, C2oC1VsPhi2Bin[i], x2err, eC2oC1VsPhi2Bin[i]);
       h1C2oC1VsPhi2Bin->SetLineColor(3);
       h1C2oC1VsPhi2Bin->SetMarkerSize(1);
       h1C2oC1VsPhi2Bin->SetMarkerStyle(21);
-      TGraphErrors *h1C2oC1VsPhi3Bin = new TGraphErrors(3, x3Bin, C2oC1VsPhi3Bin[i], x3err, NULL);
+      TGraphErrors *h1C2oC1VsPhi3Bin = new TGraphErrors(3, x3Bin, C2oC1VsPhi3Bin[i], x3err, eC2oC1VsPhi3Bin[i]);
       h1C2oC1VsPhi3Bin->SetLineColor(4);
       h1C2oC1VsPhi3Bin->SetMarkerSize(1);
       h1C2oC1VsPhi3Bin->SetMarkerStyle(22);
-      TGraphErrors *h1C2oC1VsPhi6Bin = new TGraphErrors(6, x6Bin, C2oC1VsPhi6Bin[i], x6err, NULL);
+      TGraphErrors *h1C2oC1VsPhi6Bin = new TGraphErrors(6, x6Bin, C2oC1VsPhi6Bin[i], x6err, eC2oC1VsPhi6Bin[i]);
       h1C2oC1VsPhi6Bin->SetLineColor(7);
       h1C2oC1VsPhi6Bin->SetMarkerSize(1);
       h1C2oC1VsPhi6Bin->SetMarkerStyle(23);
@@ -644,19 +720,19 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
       c1->SaveAs(Form(outputplotsfolder + "%d/h1C2oC1VsPhiCentral.png", i));
       c1->SetTitle(Form("h1C2oC1VsPhiCentral%d", i));
 
-      TGraphErrors *h1C3oC2VsPhi1Bin = new TGraphErrors(1, &x1Bin, &C3oC2VsPhi1Bin[i], &x1err, NULL);
+      TGraphErrors *h1C3oC2VsPhi1Bin = new TGraphErrors(1, &x1Bin, &C3oC2VsPhi1Bin[i], &x1err, eC3oC2VsPhi1Bin);
       h1C3oC2VsPhi1Bin->SetLineColor(2);
       h1C3oC2VsPhi1Bin->SetMarkerSize(1);
       h1C2oC1VsPhi1Bin->SetMarkerStyle(20);
-      TGraphErrors *h1C3oC2VsPhi2Bin = new TGraphErrors(2, x2Bin, C3oC2VsPhi2Bin[i], x2err, NULL);
+      TGraphErrors *h1C3oC2VsPhi2Bin = new TGraphErrors(2, x2Bin, C3oC2VsPhi2Bin[i], x2err, eC3oC2VsPhi2Bin[i]);
       h1C3oC2VsPhi2Bin->SetLineColor(3);
       h1C3oC2VsPhi2Bin->SetMarkerSize(1);
       h1C3oC2VsPhi2Bin->SetMarkerStyle(21);
-      TGraphErrors *h1C3oC2VsPhi3Bin = new TGraphErrors(3, x3Bin, C3oC2VsPhi3Bin[i], x3err, NULL);
+      TGraphErrors *h1C3oC2VsPhi3Bin = new TGraphErrors(3, x3Bin, C3oC2VsPhi3Bin[i], x3err, eC3oC2VsPhi3Bin[i]);
       h1C3oC2VsPhi3Bin->SetLineColor(4);
       h1C3oC2VsPhi3Bin->SetMarkerSize(1);
       h1C3oC2VsPhi3Bin->SetMarkerStyle(22);
-      TGraphErrors *h1C3oC2VsPhi6Bin = new TGraphErrors(6, x6Bin, C3oC2VsPhi6Bin[i], x6err, NULL);
+      TGraphErrors *h1C3oC2VsPhi6Bin = new TGraphErrors(6, x6Bin, C3oC2VsPhi6Bin[i], x6err, eC3oC2VsPhi6Bin[i]);
       h1C3oC2VsPhi6Bin->SetLineColor(7);
       h1C3oC2VsPhi6Bin->SetMarkerSize(1);
       h1C3oC2VsPhi6Bin->SetMarkerStyle(23);
@@ -679,20 +755,20 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
       c1->SetTitle(Form("h1vVsPhiCentral%d", i));
 
       c1->Clear();
-      TGraphErrors *h1C4oC2VsPhi1Bin = new TGraphErrors(1, &x1Bin, &C4oC2VsPhi1Bin[i], &x1err, NULL);
+      TGraphErrors *h1C4oC2VsPhi1Bin = new TGraphErrors(1, &x1Bin, &C4oC2VsPhi1Bin[i], &x1err, eC4oC2VsPhi1Bin);
 
       h1C4oC2VsPhi1Bin->SetLineColor(2);
       h1C4oC2VsPhi1Bin->SetMarkerSize(1);
       h1C4oC2VsPhi1Bin->SetMarkerStyle(20);
-      TGraphErrors *h1C4oC2VsPhi2Bin = new TGraphErrors(2, x2Bin, C4oC2VsPhi2Bin[i], x2err, NULL);
+      TGraphErrors *h1C4oC2VsPhi2Bin = new TGraphErrors(2, x2Bin, C4oC2VsPhi2Bin[i], x2err, eC4oC2VsPhi2Bin[i]);
       h1C4oC2VsPhi2Bin->SetLineColor(3);
       h1C4oC2VsPhi2Bin->SetMarkerSize(1);
       h1C4oC2VsPhi2Bin->SetMarkerStyle(21);
-      TGraphErrors *h1C4oC2VsPhi3Bin = new TGraphErrors(3, x3Bin, C4oC2VsPhi3Bin[i], x3err, NULL);
+      TGraphErrors *h1C4oC2VsPhi3Bin = new TGraphErrors(3, x3Bin, C4oC2VsPhi3Bin[i], x3err, eC4oC2VsPhi3Bin[i]);
       h1C4oC2VsPhi3Bin->SetLineColor(4);
       h1C4oC2VsPhi3Bin->SetMarkerSize(1);
       h1C4oC2VsPhi3Bin->SetMarkerStyle(22);
-      TGraphErrors *h1C4oC2VsPhi6Bin = new TGraphErrors(6, x6Bin, C4oC2VsPhi6Bin[i], x6err, NULL);
+      TGraphErrors *h1C4oC2VsPhi6Bin = new TGraphErrors(6, x6Bin, C4oC2VsPhi6Bin[i], x6err, eC4oC2VsPhi6Bin[i]);
       h1C4oC2VsPhi6Bin->SetLineColor(7);
       h1C4oC2VsPhi6Bin->SetMarkerSize(1);
       h1C3oC2VsPhi6Bin->SetMarkerStyle(23);

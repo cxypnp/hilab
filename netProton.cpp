@@ -372,10 +372,10 @@ void calcResolution(TH2F *h2EventPlane, double *centralityNchg,double *Resolutio
 {
    int binMax, binMin;
    int sum;
-   double mean[3] = {0,0,0};
+   double mean[9];
    // For centain phi, calculate Ci
    // CBWM include
-   for (int l = 0; l < 3; l++)
+   for (int l = 0; l < 9; l++)
    {
       sum = 0;
       if (l == 0)
@@ -384,17 +384,23 @@ void calcResolution(TH2F *h2EventPlane, double *centralityNchg,double *Resolutio
          binMin = h2EventPlane->ProjectionY()->GetBin(centralityNchg[1]);
          binMax = h2EventPlane->ProjectionY()->GetMinimumBin();
       }
-      else if (l == 1)
+      // else if (l == 1)
+      // {
+      //    // 10-60%, Set from centralityNchg to MinBin
+      //    binMin = h2EventPlane->ProjectionY()->GetBin(centralityNchg[6]);
+      //    binMax = h2EventPlane->ProjectionY()->GetBin(centralityNchg[1]);
+      // }
+      // else if (l == 2)
+      // {
+      //    // 10-60%, Set from centralityNchg to MinBin
+      //    binMin = h2EventPlane->ProjectionY()->GetBin(centralityNchg[8]);
+      //    binMax = h2EventPlane->ProjectionY()->GetBin(centralityNchg[6]);
+      // }
+      else
       {
          // 10-60%, Set from centralityNchg to MinBin
-         binMin = h2EventPlane->ProjectionY()->GetBin(centralityNchg[6]);
-         binMax = h2EventPlane->ProjectionY()->GetBin(centralityNchg[1]);
-      }
-      else if (l == 2)
-      {
-         // 10-60%, Set from centralityNchg to MinBin
-         binMin = h2EventPlane->ProjectionY()->GetBin(centralityNchg[8]);
-         binMax = h2EventPlane->ProjectionY()->GetBin(centralityNchg[6]);
+         binMin = h2EventPlane->ProjectionY()->GetBin(centralityNchg[l+1]);
+         binMax = h2EventPlane->ProjectionY()->GetBin(centralityNchg[l]);
       }
       // Loop on every centrality bin and do the modification
       for (int j = binMin; j < binMax; j++)
@@ -422,7 +428,7 @@ void calcResolution(TH2F *h2EventPlane, double *centralityNchg,double *Resolutio
 }
 
 
-void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionRP = true)
+void netProton(TString inputFile, TString outputplotsfolder = "outputFolder/", bool reconstructionRP = true)
 {
    system("rm -rf " + outputplotsfolder);
    system("mkdir -p " + outputplotsfolder);
@@ -439,7 +445,7 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
    gStyle->SetOptStat(0);
    gStyle->SetOptFit(0101);
 
-   TFile f("outputFile.root");
+   TFile f(inputFile);
 
    TH2F *h2NcgNppPhi6Bin[6];
    TH2F *h2NcgNppPhi3Bin[3];
@@ -496,7 +502,7 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
    }
 
    double centralityNchg[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-   double resolution[3] = {0, 0, 0};
+   double resolution[9];
    centralityBound(centralityNchg, h2NcgNppPhi1Bin->ProjectionY());
    TFile *hfile = TFile::Open("outputFile.root", "RECREATE");
    h2EventPlane->Write();
@@ -530,7 +536,7 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
    {
       if (l == 0)
       {
-         logOut << 5 << "%-10%:" << centralityNchg[l] << endl;
+         logOut << 0 << "%-5%:" << centralityNchg[l] << endl;
       }
       else
       {
@@ -539,33 +545,33 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
    }
 
       logOut << "resolution.log" <<endl;
-   // for (int l = 0; l < 9; l++)
-   // {
-   //    if (l == 0)
-   //    {
-   //       logOut << 5 << "%-10%:" << resolution[l] << endl;
-   //    }
-   //    else
-   //    {
-   //       logOut << l * 10 << "%" << resolution[l] << endl;
-   //    }
-   // }
-
-      for (int l = 0; l < 3; l++)
+   for (int l = 0; l < 9; l++)
    {
       if (l == 0)
       {
-         logOut << "0-10%:" << resolution[l] << endl;
+         logOut << 0 << "%-5%:" << centralityNchg[l] << endl;
       }
-      else if (l == 1)
+      else
       {
-         logOut << "10-60%" << resolution[l] << endl;
-      }
-      else if (l == 2)
-      {
-         logOut << "60-80%" << resolution[l] << endl;
+         logOut << l * 10 << "%" << resolution[l] << endl;
       }
    }
+
+   //    for (int l = 0; l < 3; l++)
+   // {
+   //    if (l == 0)
+   //    {
+   //       logOut << "0-10%:" << resolution[l] << endl;
+   //    }
+   //    else if (l == 1)
+   //    {
+   //       logOut << "10-60%" << resolution[l] << endl;
+   //    }
+   //    else if (l == 2)
+   //    {
+   //       logOut << "60-80%" << resolution[l] << endl;
+   //    }
+   // }
 
    // Loop on every angle
 
@@ -712,6 +718,7 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
       {
          mg->GetXaxis()->SetTitle("#phi-#psi_{EP}");
       }
+      else
       {
          mg->GetXaxis()->SetTitle("#phi-#psi_{RP}");
       }
@@ -746,6 +753,7 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
       {
          mg->GetXaxis()->SetTitle("#phi-#psi_{EP}");
       }
+      else
       {
          mg->GetXaxis()->SetTitle("#phi-#psi_{RP}");
       }
@@ -782,6 +790,7 @@ void netProton(TString outputplotsfolder = "outputFolder/", bool reconstructionR
       {
          mg->GetXaxis()->SetTitle("#phi-#psi_{EP}");
       }
+      else
       {
          mg->GetXaxis()->SetTitle("#phi-#psi_{RP}");
       }

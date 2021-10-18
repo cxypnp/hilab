@@ -287,8 +287,8 @@ void getCumulants(TH2F *h2NcgNpp, double *C2oC1, double *C3oC2, double *C4oC2, d
 
    // For centain phi, calculate Ci
    // CBWM included
-   double C1[3]={0,0,0}, C2[3]={0,0,0}, C3[3]={0,0,0}, C4[3]={0,0,0};
-   for (int l = 0; l < 3; l++)
+   double C1[9], C2[9], C3[9], C4[9];
+   for (int l = 0; l < 9; l++)
    {
       sum = 0;
       if (l == 0)
@@ -297,22 +297,15 @@ void getCumulants(TH2F *h2NcgNpp, double *C2oC1, double *C3oC2, double *C4oC2, d
          binMin = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[1]);
          binMax = h2NcgNpp->ProjectionY()->GetMinimumBin();
       }
-      else if (l == 1)
+      else
       {
          // 10-60%, Set from centralityNchg to MinBin
-         binMin = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[6]);
-         binMax = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[1]);
-      }
-      else if (l == 2)
-      {
-         // 10-60%, Set from centralityNchg to MinBin
-         binMin = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[8]);
-         binMax = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[6]);
+         binMin = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[l]);
+         binMax = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[l-1]);
       }
       // Loop on every centrality bin and do the modification
       for (int j = binMin; j < binMax; j++)
       {
-         
          TH1D *_netProtonDist = h2NcgNpp->ProjectionX("", j, j);
          int nEvents = _netProtonDist->Integral();
 
@@ -347,7 +340,6 @@ void getCumulants(TH2F *h2NcgNpp, double *C2oC1, double *C3oC2, double *C4oC2, d
          eC2oC1[l]+= nEvents*nEvents*varC2oC1(_moments,_mean,nEvents);
          eC3oC2[l]+= nEvents*nEvents*varC3oC2(_moments,_mean,nEvents);
          eC4oC2[l]+= nEvents*nEvents*varC4oC2(_moments,_mean,nEvents);
-
          sum += nEvents;
       }
 
@@ -360,7 +352,6 @@ void getCumulants(TH2F *h2NcgNpp, double *C2oC1, double *C3oC2, double *C4oC2, d
       C2oC1[l] = C2[l]/ C1[l];
       C3oC2[l] = C3[l]/ C2[l];
       C4oC2[l] = C4[l]/ C2[l];
-      cout << sum <<endl;
 
       eC2oC1[l] = TMath::Sqrt(eC2oC1[l])/sum;
       eC3oC2[l]= TMath::Sqrt(eC3oC2[l])/sum;
@@ -432,7 +423,7 @@ void netProton(TString inputFile, TString outputplotsfolder = "outputFolder/", b
 {
    system("rm -rf " + outputplotsfolder);
    system("mkdir -p " + outputplotsfolder);
-   for (int i = 0; i < 3; i++)
+   for (int i = 0; i < 9; i++)
    {
       system(Form("mkdir -p " + outputplotsfolder + "%d", i));
       system(Form("mkdir -p " + outputplotsfolder + "%d", i));
@@ -584,47 +575,47 @@ void netProton(TString inputFile, TString outputplotsfolder = "outputFolder/", b
    double x6Bin[6] = {1.0 * TMath::Pi() / 24, 3.0 * TMath::Pi() / 24, 5.0 * TMath::Pi() / 24, 7.0 * TMath::Pi() / 24, 9.0 * TMath::Pi() / 24, 11.0 * TMath::Pi() / 24};
    double x6err[6] = {1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24, 1.0 * TMath::Pi() / 24};
 
-   double C2oC1VsPhi6Bin[3][6];
-   double C3oC2VsPhi6Bin[3][6];
-   double C4oC2VsPhi6Bin[3][6];
+   double C2oC1VsPhi6Bin[9][6];
+   double C3oC2VsPhi6Bin[9][6];
+   double C4oC2VsPhi6Bin[9][6];
 
-   double C2oC1VsPhi3Bin[3][3];
-   double C3oC2VsPhi3Bin[3][3];
-   double C4oC2VsPhi3Bin[3][3];
+   double C2oC1VsPhi3Bin[9][3];
+   double C3oC2VsPhi3Bin[9][3];
+   double C4oC2VsPhi3Bin[9][3];
 
-   double C2oC1VsPhi2Bin[3][2];
-   double C3oC2VsPhi2Bin[3][2];
-   double C4oC2VsPhi2Bin[3][2];
+   double C2oC1VsPhi2Bin[9][2];
+   double C3oC2VsPhi2Bin[9][2];
+   double C4oC2VsPhi2Bin[9][2];
 
-   double C2oC1VsPhi1Bin[3];
-   double C3oC2VsPhi1Bin[3];
-   double C4oC2VsPhi1Bin[3];
+   double C2oC1VsPhi1Bin[9];
+   double C3oC2VsPhi1Bin[9];
+   double C4oC2VsPhi1Bin[9];
 
-   double eC2oC1VsPhi6Bin[3][6];
-   double eC3oC2VsPhi6Bin[3][6];
-   double eC4oC2VsPhi6Bin[3][6];
+   double eC2oC1VsPhi6Bin[9][6];
+   double eC3oC2VsPhi6Bin[9][6];
+   double eC4oC2VsPhi6Bin[9][6];
 
-   double eC2oC1VsPhi3Bin[3][3];
-   double eC3oC2VsPhi3Bin[3][3];
-   double eC4oC2VsPhi3Bin[3][3];
+   double eC2oC1VsPhi3Bin[9][3];
+   double eC3oC2VsPhi3Bin[9][3];
+   double eC4oC2VsPhi3Bin[9][3];
 
-   double eC2oC1VsPhi2Bin[3][2];
-   double eC3oC2VsPhi2Bin[3][2];
-   double eC4oC2VsPhi2Bin[3][2];
+   double eC2oC1VsPhi2Bin[9][2];
+   double eC3oC2VsPhi2Bin[9][2];
+   double eC4oC2VsPhi2Bin[9][2];
 
-   double eC2oC1VsPhi1Bin[3];
-   double eC3oC2VsPhi1Bin[3];
-   double eC4oC2VsPhi1Bin[3];
+   double eC2oC1VsPhi1Bin[9];
+   double eC3oC2VsPhi1Bin[9];
+   double eC4oC2VsPhi1Bin[9];
 
 
    // 6 Bins
    for (int i = 0; i < 6; i++)
    {
-      double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
-      double eC2oC1[3] = {0}, eC3oC2[3] = {0}, eC4oC2[3] = {0};
+      double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
+      double eC2oC1[9] = {0}, eC3oC2[9] = {0}, eC4oC2[9] = {0};
       getCumulants(h2NcgNppPhi6Bin[i], C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
 
-      for (int j = 0; j < 3; j++)
+      for (int j = 0; j < 9; j++)
       {
          C2oC1VsPhi6Bin[j][i] = C2oC1[j];
          C3oC2VsPhi6Bin[j][i] = C3oC2[j];
@@ -639,11 +630,11 @@ void netProton(TString inputFile, TString outputplotsfolder = "outputFolder/", b
    // 3 Bins
    for (int i = 0; i < 3;i++)
    {
-      double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
-      double eC2oC1[3] = {0}, eC3oC2[3] = {0}, eC4oC2[3] = {0};
+      double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
+      double eC2oC1[9] = {0}, eC3oC2[9] = {0}, eC4oC2[9] = {0};
       getCumulants(h2NcgNppPhi3Bin[i], C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
 
-      for (int j = 0; j < 3; j++)
+      for (int j = 0; j < 9; j++)
       {
          C2oC1VsPhi3Bin[j][i] = C2oC1[j];
          C3oC2VsPhi3Bin[j][i] = C3oC2[j];
@@ -658,11 +649,11 @@ void netProton(TString inputFile, TString outputplotsfolder = "outputFolder/", b
    // 2 Bins
    for (int i = 0; i < 2;i++)
    {
-      double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
-      double eC2oC1[3] = {0}, eC3oC2[3] = {0}, eC4oC2[3] = {0};
+      double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
+      double eC2oC1[9] = {0}, eC3oC2[9] = {0}, eC4oC2[9] = {0};
       getCumulants(h2NcgNppPhi2Bin[i], C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
 
-      for (int j = 0; j < 3; j++)
+      for (int j = 0; j < 9; j++)
       {
          C2oC1VsPhi2Bin[j][i] = C2oC1[j];
          C3oC2VsPhi2Bin[j][i] = C3oC2[j];
@@ -674,11 +665,11 @@ void netProton(TString inputFile, TString outputplotsfolder = "outputFolder/", b
       }
    }
 
-   double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
-   double eC2oC1[3] = {0}, eC3oC2[3] = {0}, eC4oC2[3] = {0};
+   double C2oC1[9] = {0}, C3oC2[9] = {0}, C4oC2[9] = {0};
+   double eC2oC1[9] = {0}, eC3oC2[9] = {0}, eC4oC2[9] = {0};
    getCumulants(h2NcgNppPhi1Bin, C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
 
-   for (int j = 0; j < 3; j++)
+   for (int j = 0; j < 9; j++)
    {
       C2oC1VsPhi1Bin[j] = C2oC1[j];
       C3oC2VsPhi1Bin[j] = C3oC2[j];
@@ -689,7 +680,7 @@ void netProton(TString inputFile, TString outputplotsfolder = "outputFolder/", b
       eC4oC2VsPhi1Bin[j] = eC4oC2[j];
    }
 
-   for (int i = 0; i < 3; i++)
+   for (int i = 0; i < 9; i++)
    {
       c1->Clear();
       TGraphErrors *h1C2oC1VsPhi1Bin = new TGraphErrors(1, &x1Bin, &C2oC1VsPhi1Bin[i], &x1err, eC2oC1VsPhi1Bin);

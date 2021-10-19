@@ -86,6 +86,12 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
          // Charged Particle
          if ((reader.fTracksOut_chg[j] != 0))
          {
+            // Non-Participant and Decay secondaries Filter
+            if (reader.fTracksOut_pptype[j] == 20 || reader.fTracksOut_Nc[j] ==0)
+            {
+               continue;
+            }
+            
             float pT = TMath::Sqrt(reader.fTracksOut_px[j] * reader.fTracksOut_px[j] + reader.fTracksOut_py[j] * reader.fTracksOut_py[j]);
             float p = TMath::Sqrt(reader.fTracksOut_px[j] * reader.fTracksOut_px[j] + reader.fTracksOut_py[j] * reader.fTracksOut_py[j] + reader.fTracksOut_pz[j] * reader.fTracksOut_pz[j]);
             float eta = 0.5 * log((p + reader.fTracksOut_pz[j]) / (p - reader.fTracksOut_pz[j]));

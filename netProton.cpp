@@ -450,7 +450,7 @@ void calcResolution(TH2F *h2EventPlane, double *centralityNchg,double *Resolutio
 }
 
 
-void netProton(TString inputFile, TString outputplotsfolder = "outputFolder/", bool reconstructionRP = true)
+void netProton(TString inputFile="inputFile.root", TString outputplotsfolder = "outputFolder/", bool reconstructionRP = true)
 {
    system("rm -rf " + outputplotsfolder);
    system("mkdir -p " + outputplotsfolder);

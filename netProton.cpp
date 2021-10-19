@@ -17,6 +17,7 @@ using namespace std;
 
 void centralityBound(double *centralityNchg, TH1D *refmult3)
 {
+   // This function is for determine the centrality bins
    TH1 *cumul = refmult3->GetCumulative(false);
    cumul->Scale(1.0 / refmult3->Integral());
    for (int k = 0; k < refmult3->GetXaxis()->GetNbins(); k++)
@@ -25,6 +26,7 @@ void centralityBound(double *centralityNchg, TH1D *refmult3)
       {
          if (l == 0)
          {
+            // 0-5% bin
             if (cumul->GetBinContent(k) > 0.05)
             {
                centralityNchg[0] = cumul->GetBinLowEdge(k);
@@ -32,6 +34,7 @@ void centralityBound(double *centralityNchg, TH1D *refmult3)
          }
          else
          {
+            // l*10% bins
             if (cumul->GetBinContent(k) > l * 0.1)
             {
                centralityNchg[l] = cumul->GetBinLowEdge(k);
@@ -43,6 +46,7 @@ void centralityBound(double *centralityNchg, TH1D *refmult3)
 
 void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgNppPhi3Bin, TH2F **h2NcgNppPhi6Bin,TH2F *h2EventPlane, bool reconstruction)
 {
+   // This function is for filling the histograms
    TTree *event = NULL;
 
    f14 reader(event);
@@ -86,6 +90,12 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
          // Charged Particle
          if ((reader.fTracksOut_chg[j] != 0))
          {
+            // Non-Participant and Decay secondaries Filter
+            if (reader.fTracksOut_pptype[j] == 20 || reader.fTracksOut_Nc[j] ==0)
+            {
+               continue;
+            }
+            
             float pT = TMath::Sqrt(reader.fTracksOut_px[j] * reader.fTracksOut_px[j] + reader.fTracksOut_py[j] * reader.fTracksOut_py[j]);
             float p = TMath::Sqrt(reader.fTracksOut_px[j] * reader.fTracksOut_px[j] + reader.fTracksOut_py[j] * reader.fTracksOut_py[j] + reader.fTracksOut_pz[j] * reader.fTracksOut_pz[j]);
             float eta = 0.5 * log((p + reader.fTracksOut_pz[j]) / (p - reader.fTracksOut_pz[j]));
@@ -110,8 +120,11 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
                   _nCharged++;
                }
             }
+
+            // Event Plane Reconstruction
             if (fabs(eta)>0.05 && pT>0.2 && pT<2 && fabs(eta)<1)
             {
+               // Divide into eta +- sub-events
                if (eta>0)
                {
                   sumQxP += pT * cos(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
@@ -129,7 +142,8 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
       // Event Plane Psi2
       double PsiP;
       double PsiM;
-      // Make Psi in 0, pi
+
+      // Make Psi in 0, 2pi
       if (atan2(sumQyP, sumQxP) > 0)
          PsiP = 0.5 * atan2(sumQyP, sumQxP);
       else
@@ -162,8 +176,13 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
                {
                   int index = 0;
                   double Psi=0;
+                  // atan() in (-0.5pi,0.5pi)
+                  // atan(abs()) in (0,0.5pi)
+                  // atan(abs())/binWidth in 0-5 (int Type)
                   if (reconstruction)
                   {
+                     // if True, use Event Plane
+                     // Eliminate Self-correlation
                      if (eta>0)
                      {
                         Psi=PsiM;
@@ -172,12 +191,15 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
                      {
                         Psi=PsiP;
                      }
+
                      index = (int)(atan(fabs((reader.fTracksOut_ry[j] * cos(Psi) - reader.fTracksOut_rx[j] * sin(Psi)) / (reader.fTracksOut_rx[j] * cos(Psi) + reader.fTracksOut_ry[j] * sin(Psi)))) / (TMath::Pi() * 1.0 / 12));
                   }
                   else
                   {
+                     // if False, use Reaction Plane
                      index = (int)(atan(fabs(reader.fTracksOut_ry[j] / reader.fTracksOut_rx[j])) / (TMath::Pi() * 1.0 / 12));
                   }
+                  // Net-Proton Multiplicity Counter
                   if (reader.fTracksOut_ityp[j] == 1)
                      _nNetProtonPhi[index]++;
                   else if (reader.fTracksOut_ityp[j] == -1)

@@ -3,7 +3,6 @@
 #include <iostream>
 
 #include "TH2F.h"
-#include "TH1I.h"
 #include "TH3F.h"
 #include "TDirectory.h"
 #include "TTree.h"
@@ -21,7 +20,7 @@ using namespace std;
 void centralityBound(double *centralityNchg, TH1D *refmult3)
 {
    // This function is for determine the centrality bins
-   TH1 *cumul = refmult3->GetCumulative(false);
+   TH1 *cumul = refmult3->GetCumulative();
    cumul->Scale(1.0 / refmult3->Integral());
    for (int k = 0; k < refmult3->GetXaxis()->GetNbins(); k++)
    {
@@ -30,7 +29,7 @@ void centralityBound(double *centralityNchg, TH1D *refmult3)
          if (l == 0)
          {
             // 0-5% bin
-            if (cumul->GetBinContent(k) > 0.05)
+            if (cumul->GetBinContent(k) < 0.05)
             {
                centralityNchg[0] = cumul->GetBinLowEdge(k);
             }
@@ -38,7 +37,7 @@ void centralityBound(double *centralityNchg, TH1D *refmult3)
          else
          {
             // l*10% bins
-            if (cumul->GetBinContent(k) > l * 0.1)
+            if (cumul->GetBinContent(k) < l * 0.1)
             {
                centralityNchg[l] = cumul->GetBinLowEdge(k);
             }
@@ -62,7 +61,7 @@ bool netProtonCut(TLorentzVector *particle)
 
 bool centralityCut(TLorentzVector *particle)
 {
-   if(TMath::Abs(particle->Eta()) < 1 && particle->Pt() > 0.1)
+   if (TMath::Abs(particle->Eta()) < 1 && particle->Pt() > 0.1)
    {
       return true;
    }
@@ -74,7 +73,7 @@ bool centralityCut(TLorentzVector *particle)
 
 bool epRecoCut(TLorentzVector *particle)
 {
-   if(particle->Pt() > 0.2 && particle->Pt() < 2 && TMath::Abs(particle->Eta()) > 0.05 && TMath::Abs(particle->Eta())< 1)
+   if (particle->Pt() > 0.2 && particle->Pt() < 2 && TMath::Abs(particle->Eta()) > 0.05 && TMath::Abs(particle->Eta()) < 1)
    {
       return true;
    }
@@ -84,9 +83,7 @@ bool epRecoCut(TLorentzVector *particle)
    }
 }
 
-
-
-void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgNppPhi3Bin, TH2F **h2NcgNppPhi6Bin, TH2F *h2EventPlane, bool reconstruction)
+void fillHistograms(TH2F *h2ImpNppPhi1Bin, TH2F **h2ImpNppPhi2Bin, TH2F **h2ImpNppPhi3Bin, TH2F **h2ImpNppPhi6Bin, TH2F *h2EventPlane, TH1F *h1EventPlaneP, TH1F *h1EventPlaneM, bool reconstruction)
 {
    // This function is for filling the histograms
 
@@ -106,7 +103,7 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
       // if (jentry == 50000)
       //    break;
 
-      Long64_t    ientry = reader.LoadTree(jentry);
+      Long64_t ientry = reader.LoadTree(jentry);
       if (ientry < 0)
          break;
 
@@ -130,54 +127,55 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
       if (reconstruction)
       {
          // Read a Event, do Event Plane Reconstruction
-      for (Int_t j = 0; j < reader.fColHdr_Ntrack; j++)
-      {
-         // Skip this particle if it is:
-         // 1. Decay Secondaries;
-         // 2. Spectators;
-         // 3. Non-charged Paricles;
-         if (reader.fTracksOut_pptype[j] == 20 || reader.fTracksOut_Nc[j] == 0 || reader.fTracksOut_chg[j] == 0)
+         for (Int_t j = 0; j < reader.fColHdr_Ntrack; j++)
          {
-            continue;
-         }
-
-         // Initialize Particle Momentum Vector (px,py,pz,p0)
-         double pVector[4] = {reader.fTracksOut_px[j], reader.fTracksOut_py[j], reader.fTracksOut_pz[j], reader.fTracksOut_p0[j]};
-         TLorentzVector *particle = new TLorentzVector(pVector);
-
-         if (epRecoCut(particle))
-         {
-            // Divide into eta +- sub-events
-            if (particle->Eta() > 0)
+            // Skip this particle if it is:
+            // 1. Decay Secondaries;
+            // 2. Spectators;
+            // 3. Non-charged Paricles;
+            if (reader.fTracksOut_pptype[j] == 20 || reader.fTracksOut_Nc[j] == 0 || reader.fTracksOut_chg[j] == 0)
             {
-               sumQxP += particle->Pt() * cos(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
-               sumQyP += particle->Pt() * sin(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
+               continue;
             }
-            else
+
+            // Initialize Particle Momentum Vector (px,py,pz,p0)
+            double pVector[4] = {reader.fTracksOut_px[j], reader.fTracksOut_py[j], reader.fTracksOut_pz[j], reader.fTracksOut_p0[j]};
+            TLorentzVector *particle = new TLorentzVector(pVector);
+
+            if (epRecoCut(particle))
             {
-               sumQxM += particle->Pt() * cos(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
-               sumQyM += particle->Pt() * sin(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
+               // Divide into eta +- sub-events
+               if (particle->Eta() > 0)
+               {
+                  sumQxP += particle->Pt() * cos(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
+                  sumQyP += particle->Pt() * sin(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
+               }
+               else
+               {
+                  sumQxM += particle->Pt() * cos(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
+                  sumQyM += particle->Pt() * sin(2 * atan2(reader.fTracksOut_ry[j], reader.fTracksOut_rx[j]));
+               }
             }
+            delete particle;
          }
-         delete particle;
+         // Event Plane Psi2
+
+         // Make Psi in 0, pi
+         // if (atan2(sumQyP, sumQxP) > 0)
+            PsiP = 0.5 * atan(sumQyP/sumQxP);
+         // else
+         //    PsiP = 0.5 * (atan(sumQyP/sumQxP) + 2 * TMath::Pi());
+
+         // if (atan2(sumQyM, sumQxM) > 0)
+            PsiM = 0.5 * atan(sumQyM/sumQxM);
+         // else
+         //    PsiM = 0.5 * (atan2(sumQyM, sumQxM) + 2 * TMath::Pi());
+
+         h1EventPlaneM->Fill(sumQyM/sumQxM);
+         h1EventPlaneP->Fill(sumQyP/sumQxP);
       }
-      // Event Plane Psi2
 
-
-      // Make Psi in 0, 2pi
-      if (atan2(sumQyP, sumQxP) > 0)
-         PsiP = 0.5 * atan2(sumQyP, sumQxP);
-      else
-         PsiP = 0.5 * (atan2(sumQyP, sumQxP) + 2 * TMath::Pi());
-
-      if (atan2(sumQyM, sumQxM) > 0)
-         PsiM = 0.5 * atan2(sumQyM, sumQxM);
-      else
-         PsiM = 0.5 * (atan2(sumQyM, sumQxM) + 2 * TMath::Pi());
-
-      }
-      
-      // Have known the Ncg and Npp, fill the h2 with the phi of every particle
+      // Have known the Imp and Npp, fill the h2 with the phi of every particle
       int _nNetProtonPhi[6] = {0, 0, 0, 0, 0, 0};
       for (Int_t j = 0; j < reader.fColHdr_Ntrack; j++)
       {
@@ -191,7 +189,7 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
          }
          double pVector[4] = {reader.fTracksOut_px[j], reader.fTracksOut_py[j], reader.fTracksOut_pz[j], reader.fTracksOut_p0[j]};
          TLorentzVector *particle = new TLorentzVector(pVector);
-         
+
          // Is it (anti-)proton?
          if (TMath::Abs(reader.fTracksOut_ityp[j]) == 1)
          {
@@ -230,7 +228,7 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
                   _nNetProtonPhi[index]--;
             }
          }
-         else if(centralityCut(particle))
+         else if (centralityCut(particle))
          {
             // Not a proton, get the Nchg
             _nCharged++;
@@ -244,16 +242,16 @@ void fillHistograms(TH2F *h2NcgNppPhi1Bin, TH2F **h2NcgNppPhi2Bin, TH2F **h2NcgN
       {
          if (j < 3)
          {
-            h2NcgNppPhi3Bin[j]->Fill(_nNetProtonPhi[2 * j] + _nNetProtonPhi[2 * j + 1], _nCharged);
+            h2ImpNppPhi3Bin[j]->Fill(_nNetProtonPhi[2 * j] + _nNetProtonPhi[2 * j + 1], reader.fEvtHdr_imp);
             if (j < 2)
             {
-               h2NcgNppPhi2Bin[j]->Fill(_nNetProtonPhi[3 * j] + _nNetProtonPhi[3 * j + 1] + _nNetProtonPhi[3 * j + 2], _nCharged);
+               h2ImpNppPhi2Bin[j]->Fill(_nNetProtonPhi[3 * j] + _nNetProtonPhi[3 * j + 1] + _nNetProtonPhi[3 * j + 2], reader.fEvtHdr_imp);
             }
          }
-         h2NcgNppPhi6Bin[j]->Fill(_nNetProtonPhi[j], _nCharged);
+         h2ImpNppPhi6Bin[j]->Fill(_nNetProtonPhi[j], reader.fEvtHdr_imp);
       }
-      h2NcgNppPhi1Bin->Fill(_nNetProtonPhi[0]+_nNetProtonPhi[1]+_nNetProtonPhi[2]+_nNetProtonPhi[3]+_nNetProtonPhi[4]+_nNetProtonPhi[5], _nCharged);
-      h2EventPlane->Fill(cos(2 * (PsiP - PsiM)), _nCharged);
+      h2ImpNppPhi1Bin->Fill(_nNetProtonPhi[0] + _nNetProtonPhi[1] + _nNetProtonPhi[2] + _nNetProtonPhi[3] + _nNetProtonPhi[4] + _nNetProtonPhi[5], reader.fEvtHdr_imp);
+      h2EventPlane->Fill(cos(2 * (PsiP - PsiM)), reader.fEvtHdr_imp);
    }
    cout << eventCounter << " events processed" << endl;
 }
@@ -333,7 +331,7 @@ double varC4oC2(double *moments, double mean, int events)
    return (-9.0 * moments[2] * moments[2] + 9.0 * moments[4] + 40.0 * moments[3] * moments[3] / moments[2] - 6.0 * moments[6] / moments[2] - 8.0 * moments[3] * moments[5] / (moments[2] * moments[2]) + 6.0 * moments[4] * moments[4] / (moments[2] * moments[2]) + moments[8] / (moments[2] * moments[2]) + 8.0 * moments[3] * moments[3] * moments[4] / (moments[2] * moments[2] * moments[2]) - 2.0 * moments[4] * moments[6] / (moments[2] * moments[2] * moments[2]) + moments[4] * moments[4] * moments[4] / (moments[2] * moments[2] * moments[2] * moments[2])) / (1.0 * events);
 }
 
-void getCumulants(TH2F *h2NcgNpp, double *C2oC1, double *C3oC2, double *C4oC2, double *eC2oC1, double *eC3oC2, double *eC4oC2, double *centralityNchg)
+void getCumulants(TH2F *h2ImpNpp, double *C2oC1, double *C3oC2, double *C4oC2, double *eC2oC1, double *eC3oC2, double *eC4oC2, double *centralityNchg)
 {
    int binMax, binMin;
    int sum;
@@ -347,26 +345,25 @@ void getCumulants(TH2F *h2NcgNpp, double *C2oC1, double *C3oC2, double *C4oC2, d
       if (l == 0)
       {
          // 0-10%, Set from centralityNchg to MinBin
-         binMin = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[1]);
-         binMax = h2NcgNpp->ProjectionY()->GetMinimumBin();
+         binMin = h2ImpNpp->ProjectionY()->GetBin(0);
+         binMax = h2ImpNpp->ProjectionY()->GetBin(centralityNchg[1]);
       }
       else if (l == 1)
       {
          // 10-60%, Set from centralityNchg to MinBin
-         binMin = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[6]);
-         binMax = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[1]);
+         binMin = h2ImpNpp->ProjectionY()->GetBin(centralityNchg[1]);
+         binMax = h2ImpNpp->ProjectionY()->GetBin(centralityNchg[6]);
       }
       else if (l == 2)
       {
          // 10-60%, Set from centralityNchg to MinBin
-         binMin = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[8]);
-         binMax = h2NcgNpp->ProjectionY()->GetBin(centralityNchg[6]);
+         binMin = h2ImpNpp->ProjectionY()->GetBin(centralityNchg[6]);
+         binMax = h2ImpNpp->ProjectionY()->GetBin(centralityNchg[8]);
       }
       // Loop on every centrality bin and do the modification
       for (int j = binMin; j < binMax; j++)
       {
-
-         TH1D *_netProtonDist = h2NcgNpp->ProjectionX("", j, j);
+         TH1D *_netProtonDist = h2ImpNpp->ProjectionX("", j, j);
          int nEvents = _netProtonDist->Integral();
 
          if (nEvents == 0 or nEvents == 1)
@@ -434,8 +431,8 @@ void calcResolution(TH2F *h2EventPlane, double *centralityNchg, double *Resoluti
       if (l == 0)
       {
          // 0-10%, Set from centralityNchg to MinBin
-         binMin = h2EventPlane->ProjectionY()->GetBin(centralityNchg[1]);
-         binMax = h2EventPlane->ProjectionY()->GetMinimumBin();
+         binMin = h2EventPlane->ProjectionY()->GetBin(0);
+         binMax = h2EventPlane->ProjectionY()->GetBin(centralityNchg[0]);
       }
       // else if (l == 1)
       // {
@@ -452,7 +449,7 @@ void calcResolution(TH2F *h2EventPlane, double *centralityNchg, double *Resoluti
       else
       {
          // 10-60%, Set from centralityNchg to MinBin
-         binMin = h2EventPlane->ProjectionY()->GetBin(centralityNchg[l + 1]);
+         binMin = h2EventPlane->ProjectionY()->GetBin(centralityNchg[l - 1]);
          binMax = h2EventPlane->ProjectionY()->GetBin(centralityNchg[l]);
       }
       // Loop on every centrality bin and do the modification
@@ -488,7 +485,7 @@ void calcResolution(TH2F *h2EventPlane, double *centralityNchg, double *Resoluti
    }
 }
 
-void netProton(TString inputFile = "inputFile.root", TString outputplotsfolder = "outputFolder/", bool reconstructionRP = false)
+void netProton(TString inputFile = "inputFile.root", TString outputplotsfolder = "outputFolder/", bool reconstructionRP = true)
 {
    system("rm -rf " + outputplotsfolder);
    system("mkdir -p " + outputplotsfolder);
@@ -507,86 +504,100 @@ void netProton(TString inputFile = "inputFile.root", TString outputplotsfolder =
 
    TFile f(inputFile);
 
-   TH2F *h2NcgNppPhi6Bin[6];
-   TH2F *h2NcgNppPhi3Bin[3];
-   TH2F *h2NcgNppPhi2Bin[2];
-   TH2F *h2NcgNppPhi1Bin = NULL;
+   TH2F *h2ImpNppPhi6Bin[6];
+   TH2F *h2ImpNppPhi3Bin[3];
+   TH2F *h2ImpNppPhi2Bin[2];
+   TH2F *h2ImpNppPhi1Bin = NULL;
    TH2F *h2EventPlane = NULL;
+   TH1F *h1EventPlaneP = NULL;
+   TH1F *h1EventPlaneM = NULL;
 
-   f.GetObject("h2NcgNppPhi1Bin", h2NcgNppPhi1Bin);
+   f.GetObject("h2ImpNppPhi1Bin", h2ImpNppPhi1Bin);
    f.GetObject("h2EventPlane", h2EventPlane);
+   f.GetObject("h1EventPlaneP", h1EventPlaneP);
+   f.GetObject("h1EventPlaneM", h1EventPlaneM);
    for (int i = 0; i < 6; i++)
    {
       if (i < 3)
       {
          if (i < 2)
          {
-            f.GetObject(Form("h2NcgNppPhi2Bin%d", i), h2NcgNppPhi2Bin[i]);
+            f.GetObject(Form("h2ImpNppPhi2Bin%d", i), h2ImpNppPhi2Bin[i]);
          }
-         f.GetObject(Form("h2NcgNppPhi3Bin%d", i), h2NcgNppPhi3Bin[i]);
+         f.GetObject(Form("h2ImpNppPhi3Bin%d", i), h2ImpNppPhi3Bin[i]);
       }
-      f.GetObject(Form("h2NcgNppPhi6Bin%d", i), h2NcgNppPhi6Bin[i]);
+      f.GetObject(Form("h2ImpNppPhi6Bin%d", i), h2ImpNppPhi6Bin[i]);
    }
 
-   if (!h2NcgNppPhi1Bin)
+   if (!h2ImpNppPhi1Bin)
    {
-      h2NcgNppPhi1Bin = new TH2F("h2NcgNppPhi1Bin", "h2NcgNppPhi1Bin", 100, -5.5, 94.5, 100, -0.5, 99.5);
-      h2NcgNppPhi1Bin->GetYaxis()->SetTitle("Charged Multiplicity");
-      h2NcgNppPhi1Bin->GetXaxis()->SetTitle("Net-Proton");
+      h2ImpNppPhi1Bin = new TH2F("h2ImpNppPhi1Bin", "h2ImpNppPhi1Bin", 100, -5.5, 94.5, 65, 0, 13.0);
+      h2ImpNppPhi1Bin->GetYaxis()->SetTitle("Impact Parameter");
+      h2ImpNppPhi1Bin->GetXaxis()->SetTitle("Net-Proton");
       for (int i = 0; i < 6; i++)
       {
          if (i < 3)
          {
             if (i < 2)
             {
-               h2NcgNppPhi2Bin[i] = new TH2F(Form("h2NcgNppPhi2Bin%d", i), Form("h2NcgNppPhi2Bin%d", i), 100, -5.5, 94.5, 100, -0.5, 99.5);
-               h2NcgNppPhi2Bin[i]->GetYaxis()->SetTitle("Charged Multiplicity");
-               h2NcgNppPhi2Bin[i]->GetXaxis()->SetTitle("Net-Proton");
-               h2NcgNppPhi2Bin[i]->GetZaxis()->SetTitle("#phi");
+               h2ImpNppPhi2Bin[i] = new TH2F(Form("h2ImpNppPhi2Bin%d", i), Form("h2ImpNppPhi2Bin%d", i), 100, -5.5, 94.5, 65, 0, 13.0);
+               h2ImpNppPhi2Bin[i]->GetYaxis()->SetTitle("Impact Parameter");
+               h2ImpNppPhi2Bin[i]->GetXaxis()->SetTitle("Net-Proton");
+               h2ImpNppPhi2Bin[i]->GetZaxis()->SetTitle("#phi");
             }
-            h2NcgNppPhi3Bin[i] = new TH2F(Form("h2NcgNppPhi3Bin%d", i), Form("h2NcgNppPhi3Bin%d", i), 100, -5.5, 94.5, 100, -0.5, 99.5);
-            h2NcgNppPhi3Bin[i]->GetYaxis()->SetTitle("Charged Multiplicity");
-            h2NcgNppPhi3Bin[i]->GetXaxis()->SetTitle("Net-Proton");
-            h2NcgNppPhi3Bin[i]->GetZaxis()->SetTitle("#phi");
+            h2ImpNppPhi3Bin[i] = new TH2F(Form("h2ImpNppPhi3Bin%d", i), Form("h2ImpNppPhi3Bin%d", i), 100, -5.5, 94.5, 65, 0, 13.0);
+            h2ImpNppPhi3Bin[i]->GetYaxis()->SetTitle("Impact Parameter");
+            h2ImpNppPhi3Bin[i]->GetXaxis()->SetTitle("Net-Proton");
+            h2ImpNppPhi3Bin[i]->GetZaxis()->SetTitle("#phi");
          }
-         h2NcgNppPhi6Bin[i] = new TH2F(Form("h2NcgNppPhi6Bin%d", i), Form("h2NcgNppPhi6Bin%d", i), 100, -5.5, 94.5, 100, -0.5, 99.5);
-         h2NcgNppPhi6Bin[i]->GetYaxis()->SetTitle("Charged Multiplicity");
-         h2NcgNppPhi6Bin[i]->GetXaxis()->SetTitle("Net-Proton");
-         h2NcgNppPhi6Bin[i]->GetZaxis()->SetTitle("#phi");
+         h2ImpNppPhi6Bin[i] = new TH2F(Form("h2ImpNppPhi6Bin%d", i), Form("h2ImpNppPhi6Bin%d", i), 100, -5.5, 94.5, 65, 0, 13.0);
+         h2ImpNppPhi6Bin[i]->GetYaxis()->SetTitle("Impact Parameter");
+         h2ImpNppPhi6Bin[i]->GetXaxis()->SetTitle("Net-Proton");
+         h2ImpNppPhi6Bin[i]->GetZaxis()->SetTitle("#phi");
       }
-      h2EventPlane = new TH2F("h2EventPlane", "h2EventPlane", 1000, -1, 1, 100, -0.5, 99.5);
-      fillHistograms(h2NcgNppPhi1Bin, h2NcgNppPhi2Bin, h2NcgNppPhi3Bin, h2NcgNppPhi6Bin, h2EventPlane, reconstructionRP);
+      h2EventPlane = new TH2F("h2EventPlane", "h2EventPlane", 100, -1, 1, 65, 0, 13.0);
+      h1EventPlaneP = new TH1F("h1EventPlaneP", "h1EventPlaneP", 100, 0, 2*TMath::Pi());
+      h1EventPlaneM = new TH1F("h1EventPlaneM", "h1EventPlaneM", 100, 0, 2*TMath::Pi());
+      
+      fillHistograms(h2ImpNppPhi1Bin, h2ImpNppPhi2Bin, h2ImpNppPhi3Bin, h2ImpNppPhi6Bin, h2EventPlane, h1EventPlaneP, h1EventPlaneM, reconstructionRP);
       h2EventPlane->GetXaxis()->SetTitle("cos 2(#psi_{2#eta+}-#psi_{2#eta-})");
-      h2EventPlane->Draw();
+      h2EventPlane->Draw("COLZ");
       c1->SaveAs("h2EventPlane.png");
+
+      h1EventPlaneP->GetXaxis()->SetTitle("#psi_{2#eta+}");
+      h1EventPlaneP->Draw("COLZ");
+      c1->SaveAs("h1EventPlaneP.png");
+      h1EventPlaneM->GetXaxis()->SetTitle("#psi_{2#eta-}");
+      h1EventPlaneM->Draw("COLZ");
+      c1->SaveAs("h1EventPlaneM.png");
    }
 
    double centralityNchg[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
    double resolution[9];
-   centralityBound(centralityNchg, h2NcgNppPhi1Bin->ProjectionY());
+   centralityBound(centralityNchg, h2ImpNppPhi1Bin->ProjectionY());
    TFile *hfile = TFile::Open("outputFile.root", "RECREATE");
    h2EventPlane->Write();
    calcResolution(h2EventPlane, centralityNchg, resolution);
-   h2NcgNppPhi1Bin->Write();
-   h2NcgNppPhi1Bin->Draw("COLZ");
-   c1->SaveAs("h2NcgNppPhi1Bin.png");
+   h2ImpNppPhi1Bin->Write();
+   h2ImpNppPhi1Bin->Draw("COLZ");
+   c1->SaveAs("h2ImpNppPhi1Bin.png");
    for (int i = 0; i < 6; i++)
    {
       if (i < 3)
       {
          if (i < 2)
          {
-            h2NcgNppPhi2Bin[i]->Write();
-            h2NcgNppPhi2Bin[i]->Draw("COLZ");
-            c1->SaveAs(Form(outputplotsfolder + "h2NcgNppPhi2Bin%d.png", i));
+            h2ImpNppPhi2Bin[i]->Write();
+            h2ImpNppPhi2Bin[i]->Draw("COLZ");
+            c1->SaveAs(Form(outputplotsfolder + "h2ImpNppPhi2Bin%d.png", i));
          }
-         h2NcgNppPhi3Bin[i]->Write();
-         h2NcgNppPhi3Bin[i]->Draw("COLZ");
-         c1->SaveAs(Form(outputplotsfolder + "h2NcgNppPhi3Bin%d.png", i));
+         h2ImpNppPhi3Bin[i]->Write();
+         h2ImpNppPhi3Bin[i]->Draw("COLZ");
+         c1->SaveAs(Form(outputplotsfolder + "h2ImpNppPhi3Bin%d.png", i));
       }
-      h2NcgNppPhi6Bin[i]->Write();
-      h2NcgNppPhi6Bin[i]->Draw("COLZ");
-      c1->SaveAs(Form(outputplotsfolder + "h2NcgNppPhi6Bin%d.png", i));
+      h2ImpNppPhi6Bin[i]->Write();
+      h2ImpNppPhi6Bin[i]->Draw("COLZ");
+      c1->SaveAs(Form(outputplotsfolder + "h2ImpNppPhi6Bin%d.png", i));
    }
 
    ofstream logOut;
@@ -681,7 +692,7 @@ void netProton(TString inputFile = "inputFile.root", TString outputplotsfolder =
    {
       double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
       double eC2oC1[3] = {0}, eC3oC2[3] = {0}, eC4oC2[3] = {0};
-      getCumulants(h2NcgNppPhi6Bin[i], C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
+      getCumulants(h2ImpNppPhi6Bin[i], C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
 
       for (int j = 0; j < 3; j++)
       {
@@ -700,7 +711,7 @@ void netProton(TString inputFile = "inputFile.root", TString outputplotsfolder =
    {
       double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
       double eC2oC1[3] = {0}, eC3oC2[3] = {0}, eC4oC2[3] = {0};
-      getCumulants(h2NcgNppPhi3Bin[i], C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
+      getCumulants(h2ImpNppPhi3Bin[i], C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
 
       for (int j = 0; j < 3; j++)
       {
@@ -719,7 +730,7 @@ void netProton(TString inputFile = "inputFile.root", TString outputplotsfolder =
    {
       double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
       double eC2oC1[3] = {0}, eC3oC2[3] = {0}, eC4oC2[3] = {0};
-      getCumulants(h2NcgNppPhi2Bin[i], C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
+      getCumulants(h2ImpNppPhi2Bin[i], C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
 
       for (int j = 0; j < 3; j++)
       {
@@ -735,7 +746,7 @@ void netProton(TString inputFile = "inputFile.root", TString outputplotsfolder =
 
    double C2oC1[3] = {0}, C3oC2[3] = {0}, C4oC2[3] = {0};
    double eC2oC1[3] = {0}, eC3oC2[3] = {0}, eC4oC2[3] = {0};
-   getCumulants(h2NcgNppPhi1Bin, C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
+   getCumulants(h2ImpNppPhi1Bin, C2oC1, C3oC2, C4oC2, eC2oC1, eC3oC2, eC4oC2, centralityNchg);
 
    for (int j = 0; j < 3; j++)
    {
@@ -860,30 +871,30 @@ void netProton(TString inputFile = "inputFile.root", TString outputplotsfolder =
    }
 
    c1->SetLogy(1);
-   h2NcgNppPhi1Bin->ProjectionX()->DrawNormalized("E");
-   h2NcgNppPhi1Bin->SetTitle("Net-proton production vs. N_{chg}");
+   h2ImpNppPhi1Bin->ProjectionX()->DrawNormalized("E");
+   h2ImpNppPhi1Bin->SetTitle("Net-proton production vs. N_{chg}");
    c1->SaveAs(outputplotsfolder + "netPro.pdf");
    c1->SaveAs(outputplotsfolder + "netPro.png");
 
-   h2NcgNppPhi1Bin->ProjectionY()->DrawNormalized("E");
+   h2ImpNppPhi1Bin->ProjectionY()->DrawNormalized("E");
    c1->SaveAs(outputplotsfolder + "refmult3.pdf");
    c1->SaveAs(outputplotsfolder + "refmult3.png");
 
-   TH1 *cumul = h2NcgNppPhi1Bin->ProjectionY()->GetCumulative(false);
+   TH1 *cumul = h2ImpNppPhi1Bin->ProjectionY()->GetCumulative(false);
    cumul->SetTitle("Cumulative Charged Particle Multiplicity");
-   cumul->Scale(1.0 / h2NcgNppPhi1Bin->ProjectionY()->Integral());
+   cumul->Scale(1.0 / h2ImpNppPhi1Bin->ProjectionY()->Integral());
    cumul->Draw("E");
    c1->SaveAs(outputplotsfolder + "refmult3Cumu.pdf");
    c1->SaveAs(outputplotsfolder + "refmult3Cumu.png");
 
    c1->SetLogz(1);
    c1->SetLogy(0);
-   h2NcgNppPhi1Bin->Draw("COLZ");
-   c1->SaveAs(outputplotsfolder + "h2NcgNppPhi1Bin.pdf");
-   c1->SaveAs(outputplotsfolder + "h2NcgNppPhi1Bin.png");
+   h2ImpNppPhi1Bin->Draw("COLZ");
+   c1->SaveAs(outputplotsfolder + "h2ImpNppPhi1Bin.pdf");
+   c1->SaveAs(outputplotsfolder + "h2ImpNppPhi1Bin.png");
 
-   int xbins = h2NcgNppPhi1Bin->GetXaxis()->GetNbins();
-   int ybins = h2NcgNppPhi1Bin->GetYaxis()->GetNbins();
+   int xbins = h2ImpNppPhi1Bin->GetXaxis()->GetNbins();
+   int ybins = h2ImpNppPhi1Bin->GetYaxis()->GetNbins();
 
    // drawEvent()->Write();
    // hfile->Write();

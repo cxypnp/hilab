@@ -13,6 +13,7 @@
 #include "f14.h"
 #include "TMultiGraph.h"
 #include "TLorentzVector.h"
+#include "TLegend.h"
 #include "TRandom.h"
 
 using namespace std;
@@ -61,6 +62,7 @@ bool netProtonCut(TLorentzVector *particle)
 
 bool centralityCut(TLorentzVector *particle)
 {
+   // Charged Particle Cut for Centrality determination
    if (TMath::Abs(particle->Eta()) < 1 && particle->Pt() > 0.1)
    {
       return true;
@@ -73,6 +75,7 @@ bool centralityCut(TLorentzVector *particle)
 
 bool epRecoCut(TLorentzVector *particle)
 {
+   // Charged Particle Cut for Event Plane Reconstruction
    if (particle->Pt() > 0.2 && particle->Pt() < 2 && TMath::Abs(particle->Eta()) > 0.05 && TMath::Abs(particle->Eta()) < 1)
    {
       return true;
@@ -85,8 +88,12 @@ bool epRecoCut(TLorentzVector *particle)
 
 void fillHistograms(TH2F **h2ImpNppPhi1Bin, TH2F *h2ImpNppPhi2Bin[][2], TH2F *h2ImpNppPhi3Bin[][3], TH2F *h2ImpNppPhi6Bin[][6], TH1F **h1EventPlane, bool onlyPrimary, double *resolution)
 {
-   TRandom *rndgen = new TRandom(time(0));
    // This function is for filling the histograms
+
+   // Random Number Generator DO SET THE SEED!
+   TRandom *rndgen = new TRandom(time(0));
+   
+   // Tree reader Initializer
    TTree *event = NULL;
    f14 reader(event);
    Long64_t nentries = reader.fChain->GetEntries();
@@ -101,6 +108,8 @@ void fillHistograms(TH2F **h2ImpNppPhi1Bin, TH2F *h2ImpNppPhi2Bin[][2], TH2F *h2
       {
          cout << "Progress %:" << jentry * 1.0 / nentries * 100 << endl;
       }
+
+      // ONLY FOR DEBUG
       // if (jentry == 50000)
       //    break;
 
@@ -108,10 +117,12 @@ void fillHistograms(TH2F **h2ImpNppPhi1Bin, TH2F *h2ImpNppPhi2Bin[][2], TH2F *h2
       if (ientry < 0)
          break;
 
+      // Event Plane of different resolutions
       double Psi[10];
       nb = reader.fChain->GetEntry(jentry);
       nbytes += nb;
 
+      // Only use the final end-state particles
       if (reader.fColHdr_timestep != 200 || reader.fColHdr_Ntrack == 0)
       {
          continue;
@@ -133,6 +144,7 @@ void fillHistograms(TH2F **h2ImpNppPhi1Bin, TH2F *h2ImpNppPhi2Bin[][2], TH2F *h2
       }
 
       // Have known the Imp, fill the h2 with the phi of every particle
+      // DO initialize the arrays
       int _nNetProtonPhi[10][6] = {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}};
       for (Int_t j = 0; j < reader.fColHdr_Ntrack; j++)
       {
@@ -150,14 +162,15 @@ void fillHistograms(TH2F **h2ImpNppPhi1Bin, TH2F *h2ImpNppPhi2Bin[][2], TH2F *h2
          else
          {
             // Skip this particle if it is:
-            // 2. Spectators;
-            // 3. Non-charged Paricles;
+            // 1. Spectators;
+            // 2. Non-charged Paricles;
             if (reader.fTracksOut_Nc[j] == 0 || reader.fTracksOut_chg[j] == 0)
             {
                continue;
             }
          }
 
+         // Initialize particle vector for cut
          double pVector[4] = {reader.fTracksOut_px[j], reader.fTracksOut_py[j], reader.fTracksOut_pz[j], reader.fTracksOut_p0[j]};
          TLorentzVector *particle = new TLorentzVector(pVector);
 
@@ -177,7 +190,7 @@ void fillHistograms(TH2F **h2ImpNppPhi1Bin, TH2F *h2ImpNppPhi2Bin[][2], TH2F *h2
                   }
                   else
                   {
-                     // if False, use Reaction Plane
+                     // if False, Just Use Reaction Plane Psi=0
                      index = (int)(atan(fabs(reader.fTracksOut_ry[j] / reader.fTracksOut_rx[j])) / (TMath::Pi() * 1.0 / 12));
                   }
                   // Net-Proton Multiplicity Counter
@@ -199,14 +212,18 @@ void fillHistograms(TH2F **h2ImpNppPhi1Bin, TH2F *h2ImpNppPhi2Bin[][2], TH2F *h2
          {
             if (j < 3)
             {
+               // 3 bin hist
                h2ImpNppPhi3Bin[i][j]->Fill(_nNetProtonPhi[i][2 * j] + _nNetProtonPhi[i][2 * j + 1], reader.fEvtHdr_imp);
                if (j < 2)
                {
+                  // 2 bin hist
                   h2ImpNppPhi2Bin[i][j]->Fill(_nNetProtonPhi[i][3 * j] + _nNetProtonPhi[i][3 * j + 1] + _nNetProtonPhi[i][3 * j + 2], reader.fEvtHdr_imp);
                }
             }
+            // 6 bin hist
             h2ImpNppPhi6Bin[i][j]->Fill(_nNetProtonPhi[i][j], reader.fEvtHdr_imp);
          }
+         // 1 bin hist
          h2ImpNppPhi1Bin[i]->Fill(_nNetProtonPhi[i][0] + _nNetProtonPhi[i][1] + _nNetProtonPhi[i][2] + _nNetProtonPhi[i][3] + _nNetProtonPhi[i][4] + _nNetProtonPhi[i][5], reader.fEvtHdr_imp);
          eventCounter++;
          // cout << _nNetProtonPhi[i][0] + _nNetProtonPhi[i][1] + _nNetProtonPhi[i][2] + _nNetProtonPhi[i][3] + _nNetProtonPhi[i][4] + _nNetProtonPhi[i][5]  << endl;
@@ -217,6 +234,7 @@ void fillHistograms(TH2F **h2ImpNppPhi1Bin, TH2F *h2ImpNppPhi2Bin[][2], TH2F *h2
 
 TH3I *drawEvent()
 {
+   // This function is for drawing a scatter plot of event particles
    TH3I *particles = new TH3I("particles", "particles", 100, -50, 50, 100, -50, 50, 100, -50, 50);
    TTree *event = NULL;
 
@@ -246,6 +264,7 @@ TH3I *drawEvent()
 
 void getMoments(TH1D *netProtonDist, double *moments)
 {
+   // Calculate central moments
    // Loop on bins (possibly including underflows/overflows)
    Int_t binx;
    Double_t w;
@@ -277,25 +296,29 @@ void getMoments(TH1D *netProtonDist, double *moments)
 
 double varC2oC1(double *moments, double mean, int events)
 {
+   // Return the VARIANCE of C2oC1
    return (-(moments[2] * moments[2]) / (mean * mean) + moments[4] / (mean * mean) - (2 * moments[2] * moments[3]) / (mean * mean * mean) + (moments[2] * moments[2] * moments[2]) / (mean * mean * mean * mean)) / (1.0 * events);
 }
 
 double varC3oC2(double *moments, double mean, int events)
 {
+   // Return the VARIANCE of C3oC2
    return (9.0 * moments[2] - (6.0 * moments[4]) / moments[2] + (6.0 * moments[3] * moments[3]) / (moments[2] * moments[2]) + moments[6] / (moments[2] * moments[2]) - (2.0 * moments[3] * moments[5]) / (moments[2] * moments[2] * moments[2]) + moments[3] * moments[3] * moments[4] / (moments[2] * moments[2] * moments[2] * moments[2])) / (1.0 * events);
 }
 
 double varC4oC2(double *moments, double mean, int events)
 {
+   // Return the VARIANCE of C4oC2
    return (-9.0 * moments[2] * moments[2] + 9.0 * moments[4] + 40.0 * moments[3] * moments[3] / moments[2] - 6.0 * moments[6] / moments[2] - 8.0 * moments[3] * moments[5] / (moments[2] * moments[2]) + 6.0 * moments[4] * moments[4] / (moments[2] * moments[2]) + moments[8] / (moments[2] * moments[2]) + 8.0 * moments[3] * moments[3] * moments[4] / (moments[2] * moments[2] * moments[2]) - 2.0 * moments[4] * moments[6] / (moments[2] * moments[2] * moments[2]) + moments[4] * moments[4] * moments[4] / (moments[2] * moments[2] * moments[2] * moments[2])) / (1.0 * events);
 }
 
 void getCumulants(TH2F *h2ImpNpp, double *C2oC1, double *C3oC2, double *C4oC2, double *eC2oC1, double *eC3oC2, double *eC4oC2, double *centralityNchg)
 {
+   // Get the cumulants of Distribution h2ImpNpp
    int binMax, binMin;
    int sum;
 
-   // For centain phi, calculate Ci
+   // For certain phi, calculate Ci
    // CBWM included
    double C1[3] = {0, 0, 0}, C2[3] = {0, 0, 0}, C3[3] = {0, 0, 0}, C4[3] = {0, 0, 0};
    for (int l = 0; l < 3; l++)
@@ -378,6 +401,7 @@ void getCumulants(TH2F *h2ImpNpp, double *C2oC1, double *C3oC2, double *C4oC2, d
 
 void drawFigures(TH2F *h2ImpNppPhi1Bin, TH2F **h2ImpNppPhi2Bin, TH2F **h2ImpNppPhi3Bin, TH2F **h2ImpNppPhi6Bin, double *centralityNchg, TString outputplotsfolder)
 {
+   // Draw the figures
    TCanvas *c1 = new TCanvas();
    double x1Bin = 0.5 * TMath::Pi() / 2;
    double x1err = 0.5 * TMath::Pi() / 2;
@@ -668,6 +692,7 @@ void netProton(TString inputFile = "primaryOnly.root", TString outputFile = "pri
       }
    }
 
+   // Resolution of Event Plane
    double resolution[10];
    for (int i = 0; i < 10; i++)
    {
@@ -681,12 +706,14 @@ void netProton(TString inputFile = "primaryOnly.root", TString outputFile = "pri
 
    TFile f(inputFile);
 
+   // Initialize figures
    TH2F *h2ImpNppPhi6Bin[10][6];
    TH2F *h2ImpNppPhi3Bin[10][3];
    TH2F *h2ImpNppPhi2Bin[10][2];
    TH2F *h2ImpNppPhi1Bin[10];
    TH1F *h1EventPlane[10];
 
+   // Get the figures if available from root file
    for (int j = 0; j < 10; j++)
    {
       f.GetObject(Form("h2ImpNppPhi1Bin%d", j), h2ImpNppPhi1Bin[j]);
@@ -705,6 +732,7 @@ void netProton(TString inputFile = "primaryOnly.root", TString outputFile = "pri
       f.GetObject(Form("h1EventPlane%d", j), h1EventPlane[j]);
    }
 
+   // If no root file, fill the histograms
    if (!h1EventPlane[0])
    {
       for (int j = 0; j < 10; j++)
@@ -739,6 +767,7 @@ void netProton(TString inputFile = "primaryOnly.root", TString outputFile = "pri
       fillHistograms(h2ImpNppPhi1Bin, h2ImpNppPhi2Bin, h2ImpNppPhi3Bin, h2ImpNppPhi6Bin, h1EventPlane, onlyPrimary, resolution);
    }
 
+   // centrality bins
    double centralityNchg[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
    centralityBound(centralityNchg, h2ImpNppPhi1Bin[0]->ProjectionY());
    ofstream logOut;
@@ -791,6 +820,7 @@ void netProton(TString inputFile = "primaryOnly.root", TString outputFile = "pri
    // Loop on every angle
    hfile->Close();
    c1->Close();
+   // Draw the figures of every resolution
    for (int i = 0; i < 10; i++)
    {
       drawFigures(h2ImpNppPhi1Bin[i], h2ImpNppPhi2Bin[i], h2ImpNppPhi3Bin[i], h2ImpNppPhi6Bin[i], centralityNchg, Form(outputplotsfolder + "Resolution%d/", i));
